@@ -310,6 +310,15 @@
 			"Rev": "417edcfd99a4d472c262e58f22b4bfe97580f03e"
 		},
 		{
+			"ImportPath": "github.com/moul/http2curl",
+			"Rev": "b1479103caacaa39319f75e7f57fc545287fca0d"
+		},
+		{
+			"ImportPath": "github.com/parnurzeal/gorequest",
+			"Comment": "v0.2.13-37-g045012d",
+			"Rev": "045012d33ef41ea146c1b675df9296d0dc1a212d"
+		},
+		{
 			"ImportPath": "github.com/satori/go.uuid",
 			"Comment": "v1.1.0-6-gb061729",
 			"Rev": "b061729afc07e77a8aa4fad0a2fd840958f1942a"
@@ -317,6 +326,10 @@
 		{
 			"ImportPath": "github.com/turnerlabs/harbor-auth-client",
 			"Rev": "7b7f3071423c5cffe223a9850b7ea67219438b8e"
+		},
+		{
+			"ImportPath": "golang.org/x/net/publicsuffix",
+			"Rev": "e7da8edaa52631091740908acaf2c2d4c9b3ce90"
 		}
 	]
 }

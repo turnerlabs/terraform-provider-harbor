@@ -1,34 +1,42 @@
-# provider level settings like where to get credentials
-provider "harbor" {
+# data provider that reads
+data "harbor_compose_token" {
   credentials = "${file("~/.harbor/credentials")}"
 }
 
-# define a shipment/environment
-resource "harbor_shipment_environment" "mss-poc-thingproxy" {
-  group       = "mss"
-  environment = "dev"
-  barge       = "digital-sandbox"
-  replicas    = "2"
+# provider level settings like where to get credentials
+provider "harbor" {
+  username = "${data.harbor_compose_token.username}"
+  token    = "${data.harbor_compose_token.token}"
+}
 
-  customer = ""
-  property = ""
-  project  = ""
-  Product  = ""
+# shipment shell
+resource "harbor_shipment" "mss-poc-terraform" {
+  shipment = "mss-poc-terraform"
+  group    = "mss"
+  barge    = "digital-sandbox"
+}
+
+# define environments
+resource "harbor_shipment_environment" "dev" {
+  shipment    = "${harbor_shipment.mss-poc-terraform.id}"
+  environment = "dev"
+  replicas    = 2
+}
+
+# define environments
+resource "harbor_shipment_environment" "qa" {
+  shipment    = "${harbor_shipment.mss-poc-terraform.id}"
+  environment = "qa"
+  replicas    = 2
 }
 
 # associate a container with the shipment
 resource "harbor_container" "web" {
-  shipment = "${harbor_shipment_environment.mss-poc-thingproxy.id}"
-
-  image = "registry.services.dmtio.net/kong:0.9.3"
-
-  # environment_variables {
-  #   REDIS         = "${elasticache_redis.redis.cache_nodes.0.address}"
-  #   SHIP_LOGS     = "aws-elasticsearch"
-  #   LOGS_ENDPOINT = "${aws_elasticsearch_domain.es.endpoint}"
-  # }
+  environment = "${harbor_shipment_environment.dev.id}"
+  image       = "registry.services.dmtio.net/kong:0.9.3"
 }
 
+# envvars
 resource "harbor_envvar" {
   container = "${harbor_container.web.id}"
 

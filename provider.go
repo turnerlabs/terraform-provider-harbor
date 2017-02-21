@@ -29,7 +29,7 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
+			"harbor_shipment": resourceHarborShipment(),
 		},
 		ConfigureFunc: providerConfigure,
 	}
@@ -65,5 +65,5 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, errors.New("token is not valid")
 	}
 
-	return creds, nil
+	return auth, nil
 }
