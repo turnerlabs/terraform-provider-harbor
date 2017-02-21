@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -16,17 +18,17 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			// "harbor_shipment": resourceHarborShipment(),
+		// "harbor_shipment": resourceHarborShipment(),
 		},
 		ConfigureFunc: providerConfigure,
 	}
 }
 
-
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	creds := d.Get("access_key").(string)
+	creds := d.Get("credential").(string)
+	log.Println(creds)
 
 	//todo: acquire valid harbor token
 
-	return nil
+	return nil, nil
 }
