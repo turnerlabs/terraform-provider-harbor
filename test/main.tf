@@ -34,7 +34,15 @@ resource "harbor_shipment_environment" "qa" {
 # associate a container with the shipment
 resource "harbor_container" "web" {
   environment = "${harbor_shipment_environment.dev.id}"
-  image       = "registry.services.dmtio.net/kong:0.9.3"
+  name        = "web"
+  image       = "quay.io/turner/web:1.0"
+}
+
+# associate a container with the shipment
+resource "harbor_container" "worker" {
+  environment = "${harbor_shipment_environment.dev.id}"
+  name        = "worker"
+  image       = "quay.io/turner/worker:1.0"
 }
 
 # envvars
