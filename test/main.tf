@@ -13,13 +13,13 @@ provider "harbor" {
 resource "harbor_shipment" "mss-poc-terraform" {
   shipment = "mss-poc-terraform"
   group    = "mss"
-  barge    = "digital-sandbox"
 }
 
 # define environments
 resource "harbor_shipment_environment" "dev" {
   shipment    = "${harbor_shipment.mss-poc-terraform.id}"
   environment = "dev"
+  barge       = "digital-sandbox"
   replicas    = 2
 }
 
@@ -27,6 +27,7 @@ resource "harbor_shipment_environment" "dev" {
 resource "harbor_shipment_environment" "qa" {
   shipment    = "${harbor_shipment.mss-poc-terraform.id}"
   environment = "qa"
+  barge       = "digital-sandbox"
   replicas    = 2
 }
 

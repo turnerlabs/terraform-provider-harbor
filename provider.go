@@ -9,7 +9,8 @@ import (
 	harborauth "github.com/turnerlabs/harbor-auth-client"
 )
 
-var authURL = "https://auth.services.dmtio.net"
+var authURI = "https://auth.services.dmtio.net"
+var shipItURI = "http://shipit.services.dmtio.net"
 
 //Auth struc
 type Auth struct {
@@ -29,7 +30,8 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"harbor_shipment": resourceHarborShipment(),
+			"harbor_shipment":             resourceHarborShipment(),
+			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
 		},
 		ConfigureFunc: providerConfigure,
 	}
@@ -52,7 +54,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	}
 
 	//validate that credentials are still valid
-	client, err := harborauth.NewAuthClient(authURL)
+	client, err := harborauth.NewAuthClient(authURI)
 	if err != nil {
 		return nil, err
 	}

@@ -27,11 +27,6 @@ func resourceHarborShipment() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"barge": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
-			},
 		},
 	}
 }
@@ -40,8 +35,6 @@ type shipmentPayload struct {
 	Name  string `json:"name,omitempty"`
 	Group string `json:"group,omitempty"`
 }
-
-var shipItURI = "http://shipit.services.dmtio.net"
 
 func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) error {
 	shipment := d.Get("shipment").(string)
@@ -71,14 +64,18 @@ func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) erro
 	return nil
 }
 
+func shipmentURI(shipment string) string {
+	return fmt.Sprintf("%s/v1/shipment/%s", shipItURI, shipment)
+}
+
 func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error {
-	uri := fmt.Sprintf("%s/v1/shipment/%s", shipItURI, d.Id())
+	uri := shipmentURI(d.Id())
 	res, body, err := gorequest.New().Get(uri).EndBytes()
 	if err != nil {
 		return err[0]
 	}
 	if res.StatusCode != 200 {
-		return errors.New("get shipment api returned " + strconv.Itoa(res.StatusCode))
+		return errors.New("get shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
 	}
 
 	var result shipmentPayload
@@ -93,7 +90,9 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) error {
 	auth := meta.(Auth)
 
-	uri := fmt.Sprintf("%s/v1/shipment/%s", shipItURI, d.Id())
+	//todo: cleanup -> set replicas=0/trigger
+
+	uri := shipmentURI(d.Id())
 	_, _, err := gorequest.New().Delete(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -106,5 +105,31 @@ func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) erro
 }
 
 func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) error {
+
+	if d.HasChange("group") {
+		_, newGroup := d.GetChange("group")
+
+		auth := meta.(Auth)
+
+		data := shipmentPayload{
+			Group: newGroup.(string),
+		}
+
+		uri := shipmentURI(d.Id())
+		res, _, err := gorequest.New().Put(uri).
+			Set("x-username", auth.Username).
+			Set("x-token", auth.Token).
+			Send(data).
+			End()
+
+		if err != nil {
+			return err[0]
+		}
+
+		if res.StatusCode != 200 {
+			return errors.New("update shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
+		}
+	}
+
 	return nil
 }
