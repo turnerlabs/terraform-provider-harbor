@@ -84,6 +84,8 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 		return unmarshalErr
 	}
 
+	d.Set("group", result.Group)
+
 	return nil
 }
 

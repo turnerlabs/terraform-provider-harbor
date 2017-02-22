@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -30,7 +31,6 @@ func resourceHarborShipmentEnvironment() *schema.Resource {
 			"barge": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
 			},
 			"replicas": &schema.Schema{
 				Type:     schema.TypeInt,
@@ -40,15 +40,34 @@ func resourceHarborShipmentEnvironment() *schema.Resource {
 	}
 }
 
+var provider = "ec2"
+
+type shipmentEnvironment struct {
+	Name           string            `json:"name,omitempty"`
+	Providers      []providerPayload `json:"providers,omitempty"`
+	ParentShipment struct {
+		Name string `json:"name,omitempty"`
+	}
+}
+
 type environmentPayload struct {
 	Name string `json:"name,omitempty"`
+}
+
+type providerPayload struct {
+	Name     string `json:"name,omitempty"`
+	Replicas int    `json:"replicas,omitempty"`
+	Barge    string `json:"barge,omitempty"`
 }
 
 func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
 	shipment := d.Get("shipment").(string)
 	environment := d.Get("environment").(string)
+	barge := d.Get("barge").(string)
+	replicas := d.Get("replicas").(int)
 	auth := meta.(Auth)
 
+	//first create the environment resource
 	data := environmentPayload{
 		Name: environment,
 	}
@@ -67,72 +86,95 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	if res.StatusCode != 200 {
 		return errors.New("create environment api returned " + strconv.Itoa(res.StatusCode))
 	}
-	d.SetId(fmt.Sprintf("shipment/%s/environment/%s", shipment, environment))
+
+	id := fmt.Sprintf("shipment/%s/environment/%s", shipment, environment)
+
+	//now create related provider resource that maintains the barge and replicas
+	//POST /v1/shipment/:Shipment/environment/:Environment/providers
+	provider := providerPayload{
+		Name:     provider,
+		Replicas: replicas,
+		Barge:    barge,
+	}
+
+	uri = fmt.Sprintf("%s/v1/%s/providers", shipItURI, id)
+	res, _, err = gorequest.New().Post(uri).
+		Set("x-username", auth.Username).
+		Set("x-token", auth.Token).
+		Send(provider).
+		End()
+
+	if err != nil {
+		return err[0]
+	}
+
+	if res.StatusCode != 200 {
+		return errors.New("create provider api returned " + strconv.Itoa(res.StatusCode))
+	}
+
+	d.SetId(id)
 	return nil
 }
 
 func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
-	// uri := shipmentURI(d.Id())
-	// res, body, err := gorequest.New().Get(uri).EndBytes()
-	// if err != nil {
-	// 	return err[0]
-	// }
-	// if res.StatusCode != 200 {
-	// 	return errors.New("get shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-	// }
 
-	// var result shipmentPayload
-	// unmarshalErr := json.Unmarshal(body, &result)
-	// if unmarshalErr != nil {
-	// 	return unmarshalErr
-	// }
+	uri := fmt.Sprintf("%s/v1/%s", shipItURI, d.Id())
+	res, body, err := gorequest.New().Get(uri).EndBytes()
+	if err != nil {
+		return err[0]
+	}
+	if res.StatusCode != 200 {
+		return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
+	}
+
+	var result shipmentEnvironment
+	unmarshalErr := json.Unmarshal(body, &result)
+	if unmarshalErr != nil {
+		return unmarshalErr
+	}
+
+	d.Set("shipment", result.ParentShipment.Name)
+	d.Set("environment", result.ParentShipment)
+	d.Set("barge", result.Providers[0].Barge)
+	d.Set("replicas", result.Providers[0].Replicas)
 
 	return nil
 }
 
 func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
-	// auth := meta.(Auth)
+	auth := meta.(Auth)
 
-	// //todo: cleanup -> set replicas=0/trigger
+	//todo: cleanup -> set replicas=0/trigger
 
-	// uri := shipmentURI(d.Id())
-	// _, _, err := gorequest.New().Delete(uri).
-	// 	Set("x-username", auth.Username).
-	// 	Set("x-token", auth.Token).
-	// 	End()
-	// if err != nil {
-	// 	return err[0]
-	// }
+	//maybe should delete provider?
+
+	//DELETE /v1/shipment/:Shipment/environment/:name
+	uri := fmt.Sprintf("%s/v1/%s", shipItURI, d.Id())
+	_, _, err := gorequest.New().Delete(uri).
+		Set("x-username", auth.Username).
+		Set("x-token", auth.Token).
+		End()
+	if err != nil {
+		return err[0]
+	}
 
 	return nil
 }
 
 func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
 
-	// if d.HasChange("group") {
-	// 	_, newGroup := d.GetChange("group")
+	//changing barge or replicas requires a trigger
+	if d.HasChange("barge") || d.HasChange("replicas") {
 
-	// 	auth := meta.(Auth)
+		//moving barges requires deleting the ELB
+		if d.HasChange("barge") {
+			//todo: cleanup -> set replicas=0/trigger
+		}
 
-	// 	data := shipmentPayload{
-	// 		Group: newGroup.(string),
-	// 	}
+		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
 
-	// 	uri := shipmentURI(d.Id())
-	// 	res, _, err := gorequest.New().Put(uri).
-	// 		Set("x-username", auth.Username).
-	// 		Set("x-token", auth.Token).
-	// 		Send(data).
-	// 		End()
-
-	// 	if err != nil {
-	// 		return err[0]
-	// 	}
-
-	// 	if res.StatusCode != 200 {
-	// 		return errors.New("update shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-	// 	}
-	// }
+		//todo: trigger
+	}
 
 	return nil
 }
