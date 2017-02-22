@@ -91,7 +91,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 
 	//now create related provider resource that maintains the barge and replicas
 	//POST /v1/shipment/:Shipment/environment/:Environment/providers
-	provider := providerPayload{
+	payload := providerPayload{
 		Name:     provider,
 		Replicas: replicas,
 		Barge:    barge,
@@ -101,7 +101,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	res, _, err = gorequest.New().Post(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
-		Send(provider).
+		Send(payload).
 		End()
 
 	if err != nil {
@@ -166,14 +166,42 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	//changing barge or replicas requires a trigger
 	if d.HasChange("barge") || d.HasChange("replicas") {
 
+		_, newBarge := d.GetChange("barge")
+		barge := newBarge.(string)
+		_, newReplicas := d.GetChange("replicas")
+		replicas := newReplicas.(int)
+
 		//moving barges requires deleting the ELB
 		if d.HasChange("barge") {
 			//todo: cleanup -> set replicas=0/trigger
 		}
 
 		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
+		payload := providerPayload{
+			Replicas: replicas,
+			Barge:    barge,
+		}
+		auth := meta.(Auth)
+
+		uri := fmt.Sprintf("%s/v1/%s/provider/%s", shipItURI, d.Id(), provider)
+		res, _, err := gorequest.New().Put(uri).
+			Set("x-username", auth.Username).
+			Set("x-token", auth.Token).
+			Send(payload).
+			End()
+
+		if err != nil {
+			return err[0]
+		}
+
+		if res.StatusCode != 200 {
+			return errors.New("update provider api returned " + strconv.Itoa(res.StatusCode))
+		}
 
 		//todo: trigger
+
+		d.Set("barge", barge)
+		d.Set("replicas", replicas)
 	}
 
 	return nil
