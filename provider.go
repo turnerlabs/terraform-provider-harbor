@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/hashicorp/terraform/helper/schema"
@@ -10,7 +11,11 @@ import (
 )
 
 var authURI = "https://auth.services.dmtio.net"
-var shipItURI = "http://shipit.services.dmtio.net"
+var shipItURI = "http://shipit.services.dmtio.net/v1"
+
+func fullyQualifiedURI(id string) string {
+	return fmt.Sprintf("%s/%s", shipItURI, id)
+}	
 
 //Auth struc
 type Auth struct {
@@ -32,6 +37,7 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"harbor_shipment":             resourceHarborShipment(),
 			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
+			"harbor_container":            resourceHarborContainer(),
 		},
 		ConfigureFunc: providerConfigure,
 	}

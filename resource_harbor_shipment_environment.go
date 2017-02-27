@@ -43,11 +43,12 @@ func resourceHarborShipmentEnvironment() *schema.Resource {
 var provider = "ec2"
 
 type shipmentEnvironment struct {
-	Name           string            `json:"name,omitempty"`
-	Providers      []providerPayload `json:"providers,omitempty"`
+	Name           string `json:"name,omitempty"`
 	ParentShipment struct {
 		Name string `json:"name,omitempty"`
 	}
+	Providers  []providerPayload  `json:"providers,omitempty"`
+	Containers []containerPayload `json:"containers,omitempty"`
 }
 
 type environmentPayload struct {
@@ -58,6 +59,18 @@ type providerPayload struct {
 	Name     string `json:"name,omitempty"`
 	Replicas int    `json:"replicas,omitempty"`
 	Barge    string `json:"barge,omitempty"`
+}
+
+type containerPayload struct {
+	Name    string          `json:"name,omitempty"`
+	Image   string          `json:"image,omitempty"`
+	EnvVars []envVarPayload `json:"envVars,omitempty"`
+}
+
+type envVarPayload struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+	Type  string `json:"type,omitempty"`
 }
 
 func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
@@ -72,7 +85,8 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		Name: environment,
 	}
 
-	uri := fmt.Sprintf("%s/v1/shipment/%s/environments", shipItURI, shipment)
+	//POST /v1/shipment/:Shipment/environments
+	uri := fullyQualifiedURI(shipment) + "/environments"
 	res, _, err := gorequest.New().Post(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -87,17 +101,18 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		return errors.New("create environment api returned " + strconv.Itoa(res.StatusCode))
 	}
 
-	id := fmt.Sprintf("shipment/%s/environment/%s", shipment, environment)
+	//use the uri fragment as the id (shipment/foo/environment/dev)
+	id := fmt.Sprintf("%s/environment/%s", shipment, environment)
 
 	//now create related provider resource that maintains the barge and replicas
-	//POST /v1/shipment/:Shipment/environment/:Environment/providers
 	payload := providerPayload{
 		Name:     provider,
 		Replicas: replicas,
 		Barge:    barge,
 	}
 
-	uri = fmt.Sprintf("%s/v1/%s/providers", shipItURI, id)
+	//POST /v1/shipment/:Shipment/environment/:Environment/providers
+	uri = fullyQualifiedURI(id + "/providers")
 	res, _, err = gorequest.New().Post(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -113,12 +128,13 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	d.SetId(id)
+
 	return nil
 }
 
 func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 
-	uri := fmt.Sprintf("%s/v1/%s", shipItURI, d.Id())
+	uri := fullyQualifiedURI(d.Id())
 	res, body, err := gorequest.New().Get(uri).EndBytes()
 	if err != nil {
 		return err[0]
@@ -133,10 +149,11 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 		return unmarshalErr
 	}
 
-	d.Set("shipment", result.ParentShipment.Name)
-	d.Set("environment", result.ParentShipment)
-	d.Set("barge", result.Providers[0].Barge)
-	d.Set("replicas", result.Providers[0].Replicas)
+	d.Set("environment", result.Name)
+
+	prov := result.Providers[0]
+	d.Set("barge", prov.Barge)
+	d.Set("replicas", prov.Replicas)
 
 	return nil
 }
@@ -149,7 +166,7 @@ func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interf
 	//maybe should delete provider?
 
 	//DELETE /v1/shipment/:Shipment/environment/:name
-	uri := fmt.Sprintf("%s/v1/%s", shipItURI, d.Id())
+	uri := fullyQualifiedURI(d.Id())
 	_, _, err := gorequest.New().Delete(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -176,14 +193,15 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 			//todo: cleanup -> set replicas=0/trigger
 		}
 
-		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
 		payload := providerPayload{
 			Replicas: replicas,
 			Barge:    barge,
 		}
+
 		auth := meta.(Auth)
 
-		uri := fmt.Sprintf("%s/v1/%s/provider/%s", shipItURI, d.Id(), provider)
+		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
+		uri := fullyQualifiedURI(fmt.Sprintf("%s/provider/%s", d.Id(), provider))
 		res, _, err := gorequest.New().Put(uri).
 			Set("x-username", auth.Username).
 			Set("x-token", auth.Token).

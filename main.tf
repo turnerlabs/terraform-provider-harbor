@@ -13,3 +13,15 @@ resource "harbor_shipment_environment" "dev" {
   barge       = "digital-sandbox"
   replicas    = 2
 }
+
+resource "harbor_container" "web" {
+  environment = "${harbor_shipment_environment.dev.id}"
+  name        = "web"
+  image       = "registry.services.dmtio.net/mss-poc-thingproxy:0.0.13-rc.42"
+}
+
+resource "harbor_container" "worker" {
+  environment = "${harbor_shipment_environment.dev.id}"
+  name        = "worker"
+  image       = "registry.services.dmtio.net/mss-poc-thingproxy:0.0.13-rc.42"
+}

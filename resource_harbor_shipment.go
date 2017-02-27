@@ -46,7 +46,9 @@ func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) erro
 		Name:  shipment,
 	}
 
-	res, _, err := gorequest.New().Post(shipItURI+"/v1/shipments/").
+	//POST /v1/shipments
+	uri := fullyQualifiedURI("shipments")
+	res, _, err := gorequest.New().Post(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
 		Send(data).
@@ -60,16 +62,15 @@ func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) erro
 		return errors.New("create shipment api returned " + strconv.Itoa(res.StatusCode))
 	}
 
-	d.SetId(shipment)
+	//use the uri fragment as the id (shipment/foo)
+	d.SetId(fmt.Sprintf("shipment/%s", shipment))
+
 	return nil
 }
 
-func shipmentURI(shipment string) string {
-	return fmt.Sprintf("%s/v1/shipment/%s", shipItURI, shipment)
-}
-
 func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error {
-	uri := shipmentURI(d.Id())
+
+	uri := fullyQualifiedURI(d.Id())
 	res, body, err := gorequest.New().Get(uri).EndBytes()
 	if err != nil {
 		return err[0]
@@ -94,7 +95,7 @@ func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) erro
 
 	//todo: cleanup -> set replicas=0/trigger
 
-	uri := shipmentURI(d.Id())
+	uri := fullyQualifiedURI(d.Id())
 	_, _, err := gorequest.New().Delete(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -117,7 +118,7 @@ func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) erro
 			Group: newGroup.(string),
 		}
 
-		uri := shipmentURI(d.Id())
+		uri := fullyQualifiedURI(d.Id())
 		res, _, err := gorequest.New().Put(uri).
 			Set("x-username", auth.Username).
 			Set("x-token", auth.Token).
