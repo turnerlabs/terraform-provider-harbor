@@ -183,7 +183,7 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 
 	//try to find container in environment resource by container name
 	if len(result.Containers) == 0 {
-		return errors.New("container " + d.Id() + " not found")
+		return nil
 	}
 
 	var matchingContainer *containerPayload
@@ -195,7 +195,7 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	if matchingContainer == nil {
-		return errors.New("container " + d.Id() + " not found")
+		return nil
 	}
 
 	//now look for matching port by name
@@ -208,7 +208,7 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	if matchingPort == nil {
-		return errors.New("port " + d.Id() + " not found")
+		return nil
 	}
 
 	//found it
@@ -288,7 +288,9 @@ func resourceHarborPortDelete(d *schema.ResourceData, meta interface{}) error {
 		return err[0]
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode == 404 || res.StatusCode == 422 {
+		return nil
+	} else if res.StatusCode != 200 {
 		return errors.New("delete port api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
 	}
 

@@ -75,7 +75,9 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 	if err != nil {
 		return err[0]
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode == 404 {
+		return nil
+	} else if res.StatusCode != 200 {
 		return errors.New("get shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
 	}
 

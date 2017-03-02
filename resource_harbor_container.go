@@ -86,7 +86,9 @@ func resourceHarborContainerRead(d *schema.ResourceData, meta interface{}) error
 	if err != nil {
 		return err[0]
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode == 404 {
+		return nil
+	} else if res.StatusCode != 200 {
 		return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
 	}
 
@@ -98,7 +100,7 @@ func resourceHarborContainerRead(d *schema.ResourceData, meta interface{}) error
 
 	//try to find container in environment resource by container name
 	if len(result.Containers) == 0 {
-		return errors.New("container " + d.Id() + " not found")
+		return nil
 	}
 
 	var matchingContainer *containerPayload
@@ -110,7 +112,7 @@ func resourceHarborContainerRead(d *schema.ResourceData, meta interface{}) error
 	}
 
 	if matchingContainer == nil {
-		return errors.New("container " + d.Id() + " not found")
+		return nil
 	}
 
 	//found it
@@ -163,7 +165,9 @@ func resourceHarborContainerDelete(d *schema.ResourceData, meta interface{}) err
 		return err[0]
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode == 404 || res.StatusCode == 422 {
+		return nil
+	} else if res.StatusCode != 200 {
 		return errors.New("delete container api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
 	}
 

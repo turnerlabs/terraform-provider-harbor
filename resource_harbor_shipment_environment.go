@@ -140,7 +140,9 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 	if err != nil {
 		return err[0]
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode == 404 {
+		return nil
+	} else if res.StatusCode != 200 {
 		return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
 	}
 
