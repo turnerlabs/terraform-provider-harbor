@@ -15,7 +15,7 @@ var shipItURI = "http://shipit.services.dmtio.net/v1"
 
 func fullyQualifiedURI(id string) string {
 	return fmt.Sprintf("%s/%s", shipItURI, id)
-}	
+}
 
 //Auth struc
 type Auth struct {
@@ -38,6 +38,7 @@ func Provider() *schema.Provider {
 			"harbor_shipment":             resourceHarborShipment(),
 			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
 			"harbor_container":            resourceHarborContainer(),
+			"harbor_port":                 resourceHarborPort(),
 		},
 		ConfigureFunc: providerConfigure,
 	}

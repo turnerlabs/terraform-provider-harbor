@@ -20,8 +20,11 @@ resource "harbor_container" "web" {
   image       = "registry.services.dmtio.net/mss-poc-thingproxy:0.0.13-rc.42"
 }
 
-resource "harbor_container" "worker" {
-  environment = "${harbor_shipment_environment.dev.id}"
-  name        = "worker"
-  image       = "registry.services.dmtio.net/mss-poc-thingproxy:0.0.13-rc.42"
+resource "harbor_port" "port" {
+  container    = "${harbor_container.web.id}"
+  name         = "80"
+  protocol     = "http"
+  value        = 3000
+  public_port  = 80
+  health_check = "/health"
 }

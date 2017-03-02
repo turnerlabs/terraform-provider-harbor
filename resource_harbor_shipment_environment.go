@@ -64,6 +64,7 @@ type providerPayload struct {
 type containerPayload struct {
 	Name    string          `json:"name,omitempty"`
 	Image   string          `json:"image,omitempty"`
+	Ports   []portPayload   `json:"ports,omitempty"`
 	EnvVars []envVarPayload `json:"envVars,omitempty"`
 }
 
