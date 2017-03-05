@@ -68,7 +68,7 @@ func resourceHarborEnvvarRead(d *schema.ResourceData, meta interface{}) error {
 	//unfortunately, the server does not implement a get on this uri so we need to look for it
 	//in the shipment/environment resource
 	shipmentEnvURI, containerName, envvarName := parseContainerResourceURI(d.Id())
-	matchingContainer, err := readContainer(shipmentEnvURI, containerName)
+	matchingContainer, err := readContainer(shipmentEnvURI, containerName, meta.(Auth))
 	if err != nil {
 		return err
 	}

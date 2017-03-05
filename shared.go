@@ -76,11 +76,14 @@ func parseContainerResourceURI(uri string) (string, string, string) {
 	return shipmentEnvURI, containerName, resourceName
 }
 
-func readContainer(shipmentEnvironmentURI string, containerName string) (*containerPayload, error) {
+func readContainer(shipmentEnvironmentURI string, containerName string, auth Auth) (*containerPayload, error) {
 
 	//fetch the shipment environment
 	uri := fullyQualifiedURI(shipmentEnvironmentURI)
-	res, body, err := gorequest.New().Get(uri).EndBytes()
+	res, body, err := gorequest.New().Get(uri).
+		Set("x-username", auth.Username).
+		Set("x-token", auth.Token).
+		EndBytes()
 	if err != nil {
 		return nil, err[0]
 	}
