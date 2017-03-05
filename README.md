@@ -1,9 +1,10 @@
 ### terraform-provider-harbor
 
-A terraform provider for managing harbor shipment-related resources.
+A Terraform provider for managing Harbor resources.
 
+This provider is currently bare bones and only does CRUD against the ShipIt API without triggering.
 
-#### usage (implemented so far)
+#### usage
 
 ```terraform
 provider "harbor" {

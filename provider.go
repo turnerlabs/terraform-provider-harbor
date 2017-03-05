@@ -39,6 +39,7 @@ func Provider() *schema.Provider {
 			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
 			"harbor_container":            resourceHarborContainer(),
 			"harbor_port":                 resourceHarborPort(),
+			"harbor_envvar":               resourceHarborEnvvar(),
 		},
 		ConfigureFunc: providerConfigure,
 	}

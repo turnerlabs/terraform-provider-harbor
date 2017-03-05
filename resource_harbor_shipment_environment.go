@@ -79,7 +79,6 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	environment := d.Get("environment").(string)
 	barge := d.Get("barge").(string)
 	replicas := d.Get("replicas").(int)
-	auth := meta.(Auth)
 
 	//first create the environment resource
 	data := environmentPayload{
@@ -88,18 +87,9 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 
 	//POST /v1/shipment/:Shipment/environments
 	uri := fullyQualifiedURI(shipment) + "/environments"
-	res, _, err := gorequest.New().Post(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(data).
-		End()
-
+	err := create(uri, meta.(Auth), data)
 	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("create environment api returned " + strconv.Itoa(res.StatusCode))
+		return err
 	}
 
 	//use the uri fragment as the id (shipment/foo/environment/dev)
@@ -114,18 +104,9 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/providers
 	uri = fullyQualifiedURI(id + "/providers")
-	res, _, err = gorequest.New().Post(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(payload).
-		End()
-
+	err = create(uri, meta.(Auth), payload)
 	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("create provider api returned " + strconv.Itoa(res.StatusCode))
+		return err
 	}
 
 	d.SetId(id)

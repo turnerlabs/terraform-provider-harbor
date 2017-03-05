@@ -131,45 +131,11 @@ func resourceHarborContainerUpdate(d *schema.ResourceData, meta interface{}) err
 			Image: newImage.(string),
 		}
 
-		//PUT /v1/shipment/:Shipment/environment/:Environment/container/:name
-		auth := meta.(Auth)
-		uri := fullyQualifiedURI(d.Id())
-		res, _, err := gorequest.New().Put(uri).
-			Set("x-username", auth.Username).
-			Set("x-token", auth.Token).
-			Send(data).
-			End()
-
-		if err != nil {
-			return err[0]
-		}
-
-		if res.StatusCode != 200 {
-			return errors.New("update container api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
-		}
+		return update(d.Id(), meta.(Auth), data)
 	}
-
 	return nil
 }
 
 func resourceHarborContainerDelete(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
-
-	//DELETE /v1/shipment/:Shipment/environment/:Environment/container/:name
-	uri := fullyQualifiedURI(d.Id())
-	res, _, err := gorequest.New().Delete(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		End()
-	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode == 404 || res.StatusCode == 422 {
-		return nil
-	} else if res.StatusCode != 200 {
-		return errors.New("delete container api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
-	}
-
-	return nil
+	return delete(d.Id(), meta.(Auth))
 }

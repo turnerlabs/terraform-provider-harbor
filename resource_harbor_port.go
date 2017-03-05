@@ -1,14 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/parnurzeal/gorequest"
 )
 
 func resourceHarborPort() *schema.Resource {
@@ -103,7 +98,6 @@ type portPayload struct {
 }
 
 func resourceHarborPortCreate(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
 
 	//read user data
 	container := d.Get("container").(string)
@@ -135,18 +129,9 @@ func resourceHarborPortCreate(d *schema.ResourceData, meta interface{}) error {
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/container/:Container/ports
 	uri := fullyQualifiedURI(container) + "/ports"
-	res, _, err := gorequest.New().Post(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(data).
-		End()
-
+	err := create(uri, meta.(Auth), data)
 	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("create port api returned " + strconv.Itoa(res.StatusCode))
+		return err
 	}
 
 	//use the uri fragment as the id (shipment/foo/environment/dev/container/bar/port/foo)
@@ -160,42 +145,10 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 	//the id of this resource is the port uri (e.g., shipment/foo/environment/dev/container/bar/port/foo)
 	//unfortunately, the server does not implement a get on this uri so we need to look for it
 	//in the shipment/environment resource
-	parts := strings.Split(d.Id(), "/")
-	shipmentEnvURI := strings.Join(parts[:4], "/")
-	containerName := parts[5]
-	portName := parts[len(parts)-1]
-
-	//fetch the port by id
-	uri := fullyQualifiedURI(shipmentEnvURI)
-	res, body, err := gorequest.New().Get(uri).EndBytes()
+	shipmentEnvURI, containerName, portName := parseContainerResourceURI(d.Id())
+	matchingContainer, err := readContainer(shipmentEnvURI, containerName)
 	if err != nil {
-		return err[0]
-	}
-	if res.StatusCode != 200 {
-		return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-	}
-
-	var result shipmentEnvironment
-	unmarshalErr := json.Unmarshal(body, &result)
-	if unmarshalErr != nil {
-		return unmarshalErr
-	}
-
-	//try to find container in environment resource by container name
-	if len(result.Containers) == 0 {
-		return nil
-	}
-
-	var matchingContainer *containerPayload
-	for _, container := range result.Containers {
-		if container.Name == containerName {
-			matchingContainer = &container
-			break
-		}
-	}
-
-	if matchingContainer == nil {
-		return nil
+		return err
 	}
 
 	//now look for matching port by name
@@ -257,42 +210,9 @@ func resourceHarborPortUpdate(d *schema.ResourceData, meta interface{}) error {
 		PublicPort:  publicPort,
 	}
 
-	auth := meta.(Auth)
-	uri := fullyQualifiedURI(d.Id())
-	res, _, err := gorequest.New().Put(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(data).
-		End()
-
-	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("update port api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
-	}
-
-	return nil
+	return update(d.Id(), meta.(Auth), data)
 }
 
 func resourceHarborPortDelete(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
-
-	uri := fullyQualifiedURI(d.Id())
-	res, _, err := gorequest.New().Delete(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		End()
-	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode == 404 || res.StatusCode == 422 {
-		return nil
-	} else if res.StatusCode != 200 {
-		return errors.New("delete port api returned " + strconv.Itoa(res.StatusCode) + " for " + d.Id())
-	}
-
-	return nil
+	return delete(d.Id(), meta.(Auth))
 }

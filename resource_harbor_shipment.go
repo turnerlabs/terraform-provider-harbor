@@ -37,33 +37,21 @@ type shipmentPayload struct {
 }
 
 func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) error {
-	shipment := d.Get("shipment").(string)
-	group := d.Get("group").(string)
-	auth := meta.(Auth)
 
 	data := shipmentPayload{
-		Group: group,
-		Name:  shipment,
+		Name:  d.Get("shipment").(string),
+		Group: d.Get("group").(string),
 	}
 
 	//POST /v1/shipments
 	uri := fullyQualifiedURI("shipments")
-	res, _, err := gorequest.New().Post(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(data).
-		End()
-
+	err := create(uri, meta.(Auth), data)
 	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("create shipment api returned " + strconv.Itoa(res.StatusCode))
+		return err
 	}
 
 	//use the uri fragment as the id (shipment/foo)
-	d.SetId(fmt.Sprintf("shipment/%s", shipment))
+	d.SetId(fmt.Sprintf("shipment/%s", data.Name))
 
 	return nil
 }
@@ -93,20 +81,8 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 }
 
 func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
-
 	//todo: cleanup -> set replicas=0/trigger
-
-	uri := fullyQualifiedURI(d.Id())
-	_, _, err := gorequest.New().Delete(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		End()
-	if err != nil {
-		return err[0]
-	}
-
-	return nil
+	return delete(d.Id(), meta.(Auth))
 }
 
 func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) error {
@@ -114,27 +90,11 @@ func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) erro
 	if d.HasChange("group") {
 		_, newGroup := d.GetChange("group")
 
-		auth := meta.(Auth)
-
 		data := shipmentPayload{
 			Group: newGroup.(string),
 		}
 
-		uri := fullyQualifiedURI(d.Id())
-		res, _, err := gorequest.New().Put(uri).
-			Set("x-username", auth.Username).
-			Set("x-token", auth.Token).
-			Send(data).
-			End()
-
-		if err != nil {
-			return err[0]
-		}
-
-		if res.StatusCode != 200 {
-			return errors.New("update shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-		}
+		return update(d.Id(), meta.(Auth), data)
 	}
-
 	return nil
 }
