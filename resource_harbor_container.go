@@ -1,14 +1,10 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/parnurzeal/gorequest"
 )
 
 func resourceHarborContainer() *schema.Resource {
@@ -38,7 +34,6 @@ func resourceHarborContainer() *schema.Resource {
 }
 
 func resourceHarborContainerCreate(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
 
 	environment := d.Get("environment").(string)
 	name := d.Get("name").(string)
@@ -52,18 +47,9 @@ func resourceHarborContainerCreate(d *schema.ResourceData, meta interface{}) err
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/containers
 	uri := fullyQualifiedURI(environment) + "/containers"
-	res, _, err := gorequest.New().Post(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		Send(data).
-		End()
-
+	err := create(uri, meta.(Auth), data)
 	if err != nil {
-		return err[0]
-	}
-
-	if res.StatusCode != 200 {
-		return errors.New("create container api returned " + strconv.Itoa(res.StatusCode))
+		return err
 	}
 
 	//use the uri fragment as the id (shipment/foo/environment/dev/container/bar)
@@ -81,38 +67,10 @@ func resourceHarborContainerRead(d *schema.ResourceData, meta interface{}) error
 
 	//resource field is required and immutable since a container resource can't exist outside of an environment
 	environment := d.Get("environment").(string)
-	uri := fullyQualifiedURI(environment)
-	res, body, err := gorequest.New().Get(uri).EndBytes()
+
+	matchingContainer, err := readContainer(environment, containerName, meta.(Auth))
 	if err != nil {
-		return err[0]
-	}
-	if res.StatusCode == 404 {
-		return nil
-	} else if res.StatusCode != 200 {
-		return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-	}
-
-	var result shipmentEnvironment
-	unmarshalErr := json.Unmarshal(body, &result)
-	if unmarshalErr != nil {
-		return unmarshalErr
-	}
-
-	//try to find container in environment resource by container name
-	if len(result.Containers) == 0 {
-		return nil
-	}
-
-	var matchingContainer *containerPayload
-	for _, container := range result.Containers {
-		if container.Name == containerName {
-			matchingContainer = &container
-			break
-		}
-	}
-
-	if matchingContainer == nil {
-		return nil
+		return err
 	}
 
 	//found it

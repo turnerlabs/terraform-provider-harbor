@@ -2,14 +2,17 @@
 
 A Terraform provider for managing Harbor resources.
 
-This provider is currently pretty bare bones and does CRUD against the ShipIt API without triggering.  The provider still adds value by:
+This provider currently maps Terraform's apply/destory CRUD framework on to ShipIt's REST API.  Still need to look at integration with the Trigger API.
+
+The provider currently adds value by:
 
 - infrastructure as code (verionable and reproducible infrastructure)
 - native integration with the vast landscape of existing terraform providers
 - all of your infrastructure declared in a single place, format, command
+- attach containers to your shipment as terraform modules
 
 
-#### usage
+#### usage example
 
 ```terraform
 provider "harbor" {
@@ -42,4 +45,25 @@ resource "harbor_port" "port" {
   public_port  = 80
   health_check = "/health"
 }
+
+resource "harbor_envvar" "REDIS" {
+  container = "${harbor_container.web.id}"
+  name      = "REDIS"
+  value     = "${module.elasticache_redis.endpoint}"
+}
+
+resource "harbor_envvar" "access-key" {
+  container = "${harbor_container.web.id}"
+  name      = "AWS_ACCESS_KEY"
+  value     = "${module.s3-user.iam_access_key_id}"
+  type      = "hidden"
+}
+
+resource "harbor_envvar" "secret-key" {
+  container = "${harbor_container.web.id}"
+  name      = "AWS_SECRET_KEY"
+  value     = "${module.s3-user.iam_access_key_secret}"
+  type      = "hidden"
+}
+
 ```

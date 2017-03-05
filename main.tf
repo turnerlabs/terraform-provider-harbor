@@ -28,3 +28,9 @@ resource "harbor_port" "port" {
   public_port  = 80
   health_check = "/health"
 }
+
+resource "harbor_envvar" "REDIS" {
+  container = "${harbor_container.web.id}"
+  name      = "REDIS"
+  value     = "foo"
+}

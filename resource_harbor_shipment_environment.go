@@ -143,23 +143,12 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 }
 
 func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(Auth)
-
 	//todo: cleanup -> set replicas=0/trigger
 
 	//maybe should delete provider?
 
 	//DELETE /v1/shipment/:Shipment/environment/:name
-	uri := fullyQualifiedURI(d.Id())
-	_, _, err := gorequest.New().Delete(uri).
-		Set("x-username", auth.Username).
-		Set("x-token", auth.Token).
-		End()
-	if err != nil {
-		return err[0]
-	}
-
-	return nil
+	return delete(d.Id(), meta.(Auth))
 }
 
 func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
@@ -177,33 +166,17 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 			//todo: cleanup -> set replicas=0/trigger
 		}
 
-		payload := providerPayload{
+		data := providerPayload{
 			Replicas: replicas,
 			Barge:    barge,
 		}
 
-		auth := meta.(Auth)
-
 		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
 		uri := fullyQualifiedURI(fmt.Sprintf("%s/provider/%s", d.Id(), provider))
-		res, _, err := gorequest.New().Put(uri).
-			Set("x-username", auth.Username).
-			Set("x-token", auth.Token).
-			Send(payload).
-			End()
-
-		if err != nil {
-			return err[0]
-		}
-
-		if res.StatusCode != 200 {
-			return errors.New("update provider api returned " + strconv.Itoa(res.StatusCode))
-		}
+		return update(uri, meta.(Auth), data)
 
 		//todo: trigger
 
-		d.Set("barge", barge)
-		d.Set("replicas", replicas)
 	}
 
 	return nil

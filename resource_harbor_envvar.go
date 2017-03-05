@@ -25,8 +25,9 @@ func resourceHarborEnvvar() *schema.Resource {
 				ForceNew: true,
 			},
 			"value": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
+				Type:      schema.TypeString,
+				Required:  true,
+				Sensitive: true,
 			},
 			"type": &schema.Schema{
 				Type:     schema.TypeString,
