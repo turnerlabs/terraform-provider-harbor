@@ -2,7 +2,12 @@
 
 A Terraform provider for managing Harbor resources.
 
-This provider is currently bare bones and only does CRUD against the ShipIt API without triggering.
+This provider is currently pretty bare bones and does CRUD against the ShipIt API without triggering.  The provider still adds value by:
+
+- infrastructure as code (verionable and reproducible infrastructure)
+- native integration with the vast landscape of existing terraform providers
+- all of your infrastructure declared in a single place, format, command
+
 
 #### usage
 
