@@ -1,15 +1,16 @@
-### terraform-provider-harbor
+terraform-provider-harbor
+==========================
 
-A Terraform provider for managing Harbor resources.
+A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://github.com/turnerlabs/harbor) resources.
 
-This provider currently maps Terraform's apply/destory CRUD framework on to ShipIt's REST API.  Still need to look at integration with the Trigger API.
+This provider currently maps Terraform's apply/destory CRUD framework on to ShipIt's REST API.  
 
-The provider currently adds value by:
+Benefits:
 
 - infrastructure as code (verionable and reproducible infrastructure)
-- native integration with the vast landscape of existing terraform providers
 - all of your infrastructure declared in a single place, format, command
-- attach containers to your shipment as terraform modules
+- native integration with the vast landscape of existing terraform providers
+- integrate reusable containers with your shipment as terraform modules
 
 
 #### usage example
@@ -37,13 +38,15 @@ resource "harbor_container" "web" {
   image       = "registry.services.dmtio.net/mss-poc-thingproxy:0.0.13-rc.42"
 }
 
-resource "harbor_port" "port" {
-  container    = "${harbor_container.web.id}"
-  name         = "80"
-  protocol     = "http"
-  value        = 3000
-  public_port  = 80
-  health_check = "/health"
+resource "harbor_port" "ssl" {
+  container           = "${harbor_container.web.id}"
+  name                = "ssl"
+  protocol            = "https"
+  public_port         = 443
+  value               = 3000  
+  health_check        = "/health"
+  ssl_management_type = "acm"
+  ssl_arn             = "${aws_acm_certificate.my-app.arn}"
 }
 
 resource "harbor_envvar" "REDIS" {
@@ -67,3 +70,8 @@ resource "harbor_envvar" "secret-key" {
 }
 
 ```
+
+### todo
+
+- consider if/how to integrate trigger/deployments
+- output endpoints and load balancer info
