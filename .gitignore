@@ -2,3 +2,5 @@ terraform-provider-harbor
 *.tfstate
 *.tfstate.backup
 .terraform
+main.tf
+test
