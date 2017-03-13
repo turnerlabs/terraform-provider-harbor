@@ -4,3 +4,6 @@ terraform-provider-harbor
 .terraform
 main.tf
 test
+trigger.md
+docker-compose.yml
+harbor-compose.yml

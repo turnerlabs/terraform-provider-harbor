@@ -86,8 +86,8 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	//POST /v1/shipment/:Shipment/environments
-	uri := fullyQualifiedURI(shipment) + "/environments"
-	err := create(uri, meta.(Auth), data)
+	uri := shipment + "/environments"
+	err := create(uri, meta.(*Auth), data)
 	if err != nil {
 		return err
 	}
@@ -103,8 +103,8 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/providers
-	uri = fullyQualifiedURI(id + "/providers")
-	err = create(uri, meta.(Auth), payload)
+	uri = id + "/providers"
+	err = create(uri, meta.(*Auth), payload)
 	if err != nil {
 		return err
 	}
@@ -143,12 +143,8 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 }
 
 func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
-	//todo: cleanup -> set replicas=0/trigger
-
-	//maybe should delete provider?
-
 	//DELETE /v1/shipment/:Shipment/environment/:name
-	return delete(d.Id(), meta.(Auth))
+	return delete(d.Id(), meta.(*Auth))
 }
 
 func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
@@ -156,15 +152,8 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	//changing barge or replicas requires a trigger
 	if d.HasChange("barge") || d.HasChange("replicas") {
 
-		_, newBarge := d.GetChange("barge")
-		barge := newBarge.(string)
-		_, newReplicas := d.GetChange("replicas")
-		replicas := newReplicas.(int)
-
-		//moving barges requires deleting the ELB
-		if d.HasChange("barge") {
-			//todo: cleanup -> set replicas=0/trigger
-		}
+		barge := d.Get("barge").(string)
+		replicas := d.Get("replicas").(int)
 
 		data := providerPayload{
 			Replicas: replicas,
@@ -172,11 +161,8 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		}
 
 		//PUT /v1/shipment/:Shipment/environment/:Environment/provider/:name
-		uri := fullyQualifiedURI(fmt.Sprintf("%s/provider/%s", d.Id(), provider))
-		return update(uri, meta.(Auth), data)
-
-		//todo: trigger
-
+		uri := fmt.Sprintf("%s/provider/%s", d.Id(), provider)
+		return update(uri, meta.(*Auth), data)
 	}
 
 	return nil

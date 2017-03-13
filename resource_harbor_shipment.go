@@ -44,14 +44,27 @@ func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) erro
 	}
 
 	//POST /v1/shipments
-	uri := fullyQualifiedURI("shipments")
-	err := create(uri, meta.(Auth), data)
+	err := create("shipments", meta.(*Auth), data)
+	if err != nil {
+		return err
+	}
+
+	id := fmt.Sprintf("shipment/%s", data.Name)
+
+	//create the required shipment envvar for customer/group
+	customerEnvVar := envVarPayload{
+		Name:  "CUSTOMER",
+		Value: data.Group,
+	}
+
+	//POST /v1/shipment/:Shipment/envVars
+	err = create(id+"/envVars", meta.(*Auth), customerEnvVar)
 	if err != nil {
 		return err
 	}
 
 	//use the uri fragment as the id (shipment/foo)
-	d.SetId(fmt.Sprintf("shipment/%s", data.Name))
+	d.SetId(id)
 
 	return nil
 }
@@ -82,19 +95,31 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 
 func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) error {
 	//todo: cleanup -> set replicas=0/trigger
-	return delete(d.Id(), meta.(Auth))
+	//customer envvar should get cascade deleted
+	return delete(d.Id(), meta.(*Auth))
 }
 
 func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) error {
 
 	if d.HasChange("group") {
-		_, newGroup := d.GetChange("group")
 
 		data := shipmentPayload{
-			Group: newGroup.(string),
+			Group: d.Get("group").(string),
 		}
 
-		return update(d.Id(), meta.(Auth), data)
+		//update the required shipment envvar for customer/group
+		customerEnvVar := envVarPayload{
+			Value: data.Group,
+		}
+
+		uri := d.Id() + "/envVar/CUSTOMER"
+		err := update(uri, meta.(*Auth), customerEnvVar)
+		if err != nil {
+			return err
+		}
+
+		//update the shipment
+		return update(d.Id(), meta.(*Auth), data)
 	}
 	return nil
 }

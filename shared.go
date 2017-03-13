@@ -9,7 +9,9 @@ import (
 	"github.com/parnurzeal/gorequest"
 )
 
-func create(uri string, auth Auth, data interface{}) error {
+func create(uriResource string, auth *Auth, data interface{}) error {
+
+	uri := fullyQualifiedURI(uriResource)
 	res, _, err := gorequest.New().Post(uri).
 		Set("x-username", auth.Username).
 		Set("x-token", auth.Token).
@@ -27,7 +29,7 @@ func create(uri string, auth Auth, data interface{}) error {
 	return nil
 }
 
-func update(uriResource string, auth Auth, data interface{}) error {
+func update(uriResource string, auth *Auth, data interface{}) error {
 
 	uri := fullyQualifiedURI(uriResource)
 	res, _, err := gorequest.New().Put(uri).
@@ -47,7 +49,7 @@ func update(uriResource string, auth Auth, data interface{}) error {
 	return nil
 }
 
-func delete(uriResource string, auth Auth) error {
+func delete(uriResource string, auth *Auth) error {
 
 	uri := fullyQualifiedURI(uriResource)
 	res, _, err := gorequest.New().Delete(uri).
@@ -76,7 +78,7 @@ func parseContainerResourceURI(uri string) (string, string, string) {
 	return shipmentEnvURI, containerName, resourceName
 }
 
-func readContainer(shipmentEnvironmentURI string, containerName string, auth Auth) (*containerPayload, error) {
+func readContainer(shipmentEnvironmentURI string, containerName string, auth *Auth) (*containerPayload, error) {
 
 	//fetch the shipment environment
 	uri := fullyQualifiedURI(shipmentEnvironmentURI)

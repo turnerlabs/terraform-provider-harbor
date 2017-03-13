@@ -46,8 +46,8 @@ func resourceHarborContainerCreate(d *schema.ResourceData, meta interface{}) err
 	}
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/containers
-	uri := fullyQualifiedURI(environment) + "/containers"
-	err := create(uri, meta.(Auth), data)
+	uri := environment + "/containers"
+	err := create(uri, meta.(*Auth), data)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func resourceHarborContainerRead(d *schema.ResourceData, meta interface{}) error
 	//resource field is required and immutable since a container resource can't exist outside of an environment
 	environment := d.Get("environment").(string)
 
-	matchingContainer, err := readContainer(environment, containerName, meta.(Auth))
+	matchingContainer, err := readContainer(environment, containerName, meta.(*Auth))
 	if err != nil {
 		return err
 	}
@@ -83,17 +83,16 @@ func resourceHarborContainerUpdate(d *schema.ResourceData, meta interface{}) err
 
 	//image is the only updateable field
 	if d.HasChange("image") {
-		_, newImage := d.GetChange("image")
 
 		data := containerPayload{
-			Image: newImage.(string),
+			Image: d.Get("image").(string),
 		}
 
-		return update(d.Id(), meta.(Auth), data)
+		return update(d.Id(), meta.(*Auth), data)
 	}
 	return nil
 }
 
 func resourceHarborContainerDelete(d *schema.ResourceData, meta interface{}) error {
-	return delete(d.Id(), meta.(Auth))
+	return delete(d.Id(), meta.(*Auth))
 }

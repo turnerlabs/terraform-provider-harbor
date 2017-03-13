@@ -51,8 +51,8 @@ func resourceHarborEnvvarCreate(d *schema.ResourceData, meta interface{}) error 
 	}
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/container/:Container/envVars
-	uri := fullyQualifiedURI(container) + "/envvars"
-	err := create(uri, meta.(Auth), data)
+	uri := container + "/envvars"
+	err := create(uri, meta.(*Auth), data)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func resourceHarborEnvvarRead(d *schema.ResourceData, meta interface{}) error {
 	//unfortunately, the server does not implement a get on this uri so we need to look for it
 	//in the shipment/environment resource
 	shipmentEnvURI, containerName, envvarName := parseContainerResourceURI(d.Id())
-	matchingContainer, err := readContainer(shipmentEnvURI, containerName, meta.(Auth))
+	matchingContainer, err := readContainer(shipmentEnvURI, containerName, meta.(*Auth))
 	if err != nil {
 		return err
 	}
@@ -95,16 +95,19 @@ func resourceHarborEnvvarRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceHarborEnvvarUpdate(d *schema.ResourceData, meta interface{}) error {
+	if d.HasChange("value") || d.HasChange("type") {
 
-	//read user data
-	data := envVarPayload{
-		Value: d.Get("value").(string),
-		Type:  d.Get("type").(string),
+		//read user data
+		data := envVarPayload{
+			Value: d.Get("value").(string),
+			Type:  d.Get("type").(string),
+		}
+
+		return update(d.Id(), meta.(*Auth), data)
 	}
-
-	return update(d.Id(), meta.(Auth), data)
+	return nil
 }
 
 func resourceHarborEnvvarDelete(d *schema.ResourceData, meta interface{}) error {
-	return delete(d.Id(), meta.(Auth))
+	return delete(d.Id(), meta.(*Auth))
 }

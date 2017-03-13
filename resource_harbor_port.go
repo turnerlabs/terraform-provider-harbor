@@ -128,8 +128,8 @@ func resourceHarborPortCreate(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/container/:Container/ports
-	uri := fullyQualifiedURI(container) + "/ports"
-	err := create(uri, meta.(Auth), data)
+	uri := container + "/ports"
+	err := create(uri, meta.(*Auth), data)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 	//unfortunately, the server does not implement a get on this uri so we need to look for it
 	//in the shipment/environment resource
 	shipmentEnvURI, containerName, portName := parseContainerResourceURI(d.Id())
-	matchingContainer, err := readContainer(shipmentEnvURI, containerName, meta.(Auth))
+	matchingContainer, err := readContainer(shipmentEnvURI, containerName, meta.(*Auth))
 	if err != nil {
 		return err
 	}
@@ -210,9 +210,9 @@ func resourceHarborPortUpdate(d *schema.ResourceData, meta interface{}) error {
 		PublicPort:  publicPort,
 	}
 
-	return update(d.Id(), meta.(Auth), data)
+	return update(d.Id(), meta.(*Auth), data)
 }
 
 func resourceHarborPortDelete(d *schema.ResourceData, meta interface{}) error {
-	return delete(d.Id(), meta.(Auth))
+	return delete(d.Id(), meta.(*Auth))
 }

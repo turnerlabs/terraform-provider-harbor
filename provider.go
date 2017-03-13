@@ -75,5 +75,5 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, errors.New("token is not valid")
 	}
 
-	return auth, nil
+	return &auth, nil
 }
