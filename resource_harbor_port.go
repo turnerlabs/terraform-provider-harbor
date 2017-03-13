@@ -62,6 +62,14 @@ func resourceHarborPort() *schema.Resource {
 				Optional: true,
 				Default:  false,
 			},
+			"ssl_arn": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"ssl_management_type": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+			},
 			"private_key": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -74,27 +82,25 @@ func resourceHarborPort() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"ssl_arn": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"ssl_management_type": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-			},
 		},
 	}
 }
 
 type portPayload struct {
-	Name        string `json:"name,omitempty"`
-	Value       int    `json:"value,omitempty"`
-	Protocol    string `json:"protocol,omitempty"`
-	Healthcheck string `json:"healthcheck,omitempty"`
-	Primary     bool   `json:"primary,omitempty"`
-	External    bool   `json:"external,omitempty"`
-	PublicVip   bool   `json:"public_vip,omitempty"`
-	PublicPort  int    `json:"public_port,omitempty"`
+	Name                 string `json:"name,omitempty"`
+	Value                int    `json:"value,omitempty"`
+	Protocol             string `json:"protocol,omitempty"`
+	Healthcheck          string `json:"healthcheck,omitempty"`
+	Primary              bool   `json:"primary,omitempty"`
+	External             bool   `json:"external,omitempty"`
+	PublicVip            bool   `json:"public_vip,omitempty"`
+	PublicPort           int    `json:"public_port,omitempty"`
+	EnableProxyProtocol  bool   `json:"enable_proxy_protocol,omitempty"`
+	SslArn               string `json:"ssl_arn,omitempty"`
+	SslManagementType    string `json:"ssl_management_type,omitempty"`
+	PublicKeyCertificate string `json:"public_key_certificate,omitempty"`
+	PrivateKey           string `json:"private_key,omitempty"`
+	CertificateChain     string `json:"certificate_chain,omitempty"`
 }
 
 func resourceHarborPortCreate(d *schema.ResourceData, meta interface{}) error {
@@ -109,22 +115,29 @@ func resourceHarborPortCreate(d *schema.ResourceData, meta interface{}) error {
 	publicPort := d.Get("public_port").(int)
 	publicVip := d.Get("public_vip").(bool)
 	healthCheck := d.Get("health_check").(string)
-	// enableProxyProtocol := d.Get("enable_proxy_protocol").(bool)
-	// publicKeyCert := d.Get("public_key_certificate").(string)
-	// certChain := d.Get("certificate_chain").(string)
-	// sslArn := d.Get("ssl_arn").(string)
-	// sslManagementType := d.Get("ssl_management_type").(string)
+	enableProxyProtocol := d.Get("enable_proxy_protocol").(bool)
+	sslArn := d.Get("ssl_arn").(string)
+	sslManagementType := d.Get("ssl_management_type").(string)
+	publicKeyCertificate := d.Get("public_key_certificate").(string)
+	privateKey := d.Get("private_key").(string)
+	certificateChain := d.Get("certificate_chain").(string)
 
 	//create the container resource
 	data := portPayload{
-		Name:        name,
-		Value:       value,
-		Protocol:    protocol,
-		Healthcheck: healthCheck,
-		Primary:     primary,
-		External:    external,
-		PublicVip:   publicVip,
-		PublicPort:  publicPort,
+		Name:                 name,
+		Value:                value,
+		Protocol:             protocol,
+		Healthcheck:          healthCheck,
+		Primary:              primary,
+		External:             external,
+		PublicVip:            publicVip,
+		PublicPort:           publicPort,
+		EnableProxyProtocol:  enableProxyProtocol,
+		SslArn:               sslArn,
+		SslManagementType:    sslManagementType,
+		PublicKeyCertificate: publicKeyCertificate,
+		PrivateKey:           privateKey,
+		CertificateChain:     certificateChain,
 	}
 
 	//POST /v1/shipment/:Shipment/environment/:Environment/container/:Container/ports
@@ -173,11 +186,12 @@ func resourceHarborPortRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("public_port", matchingPort.PublicPort)
 	d.Set("public_vip", matchingPort.PublicVip)
 	d.Set("health_check", matchingPort.Healthcheck)
-	// enableProxyProtocol := d.Get("enable_proxy_protocol").(bool)
-	// publicKeyCert := d.Get("public_key_certificate").(string)
-	// certChain := d.Get("certificate_chain").(string)
-	// sslArn := d.Get("ssl_arn").(string)
-	// sslManagementType := d.Get("ssl_management_type").(string)
+	d.Set("enable_proxy_protocol", matchingPort.EnableProxyProtocol)
+	d.Set("ssl_management_type", matchingPort.SslManagementType)
+	d.Set("ssl_arn", matchingPort.SslArn)
+	d.Set("private_key", matchingPort.PrivateKey)
+	d.Set("public_key_certificate", matchingPort.PublicKeyCertificate)
+	d.Set("certificate_chain", matchingPort.CertificateChain)
 
 	return nil
 }
@@ -193,21 +207,28 @@ func resourceHarborPortUpdate(d *schema.ResourceData, meta interface{}) error {
 	publicPort := d.Get("public_port").(int)
 	publicVip := d.Get("public_vip").(bool)
 	healthCheck := d.Get("health_check").(string)
-	// enableProxyProtocol := d.Get("enable_proxy_protocol").(bool)
-	// publicKeyCert := d.Get("public_key_certificate").(string)
-	// certChain := d.Get("certificate_chain").(string)
-	// sslArn := d.Get("ssl_arn").(string)
-	// sslManagementType := d.Get("ssl_management_type").(string)
+	enableProxyProtocol := d.Get("enable_proxy_protocol").(bool)
+	sslArn := d.Get("ssl_arn").(string)
+	sslManagementType := d.Get("ssl_management_type").(string)
+	privateKey := d.Get("private_key").(string)
+	publicKeyCertificate := d.Get("public_key_certificate").(string)
+	certificateChaig := d.Get("certificate_chain").(string)
 
 	data := portPayload{
-		Name:        name,
-		Value:       value,
-		Protocol:    protocol,
-		Healthcheck: healthCheck,
-		Primary:     primary,
-		External:    external,
-		PublicVip:   publicVip,
-		PublicPort:  publicPort,
+		Name:                 name,
+		Value:                value,
+		Protocol:             protocol,
+		Healthcheck:          healthCheck,
+		Primary:              primary,
+		External:             external,
+		PublicVip:            publicVip,
+		PublicPort:           publicPort,
+		EnableProxyProtocol:  enableProxyProtocol,
+		SslManagementType:    sslManagementType,
+		SslArn:               sslArn,
+		PrivateKey:           privateKey,
+		PublicKeyCertificate: publicKeyCertificate,
+		CertificateChain:     certificateChaig,
 	}
 
 	return update(d.Id(), meta.(*Auth), data)
