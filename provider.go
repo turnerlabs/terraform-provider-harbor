@@ -17,7 +17,7 @@ func fullyQualifiedURI(id string) string {
 	return fmt.Sprintf("%s/%s", shipItURI, id)
 }
 
-//Auth struc
+//Auth struct
 type Auth struct {
 	Version  string `json:"version"`
 	Username string `json:"username"`
@@ -31,7 +31,7 @@ func Provider() *schema.Provider {
 			"credentials": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "credentials to manage harbor shipments",
+				Description: "Harbor credentials. Run harbor-compose login to populate.",
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
@@ -40,6 +40,9 @@ func Provider() *schema.Provider {
 			"harbor_container":            resourceHarborContainer(),
 			"harbor_port":                 resourceHarborPort(),
 			"harbor_envvar":               resourceHarborEnvvar(),
+		},
+		DataSourcesMap: map[string]*schema.Resource{
+			"harbor_elb": dataSourceHarborElb(),
 		},
 		ConfigureFunc: providerConfigure,
 	}

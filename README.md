@@ -3,11 +3,13 @@ terraform-provider-harbor
 
 A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://github.com/turnerlabs/harbor) resources.
 
-This provider currently maps Terraform's apply/destory CRUD framework on to ShipIt's REST API.  
+**experimental
+
+This provider currently maps Terraform's apply/destroy CRUD framework on to ShipIt's REST API.
 
 Benefits:
 
-- infrastructure as code (verionable and reproducible infrastructure)
+- infrastructure as code (versionable and reproducible infrastructure)
 - all of your infrastructure declared in a single place, format, command
 - native integration with the vast landscape of existing terraform providers
 - integrate reusable containers with your shipment as terraform modules
@@ -69,6 +71,33 @@ resource "harbor_envvar" "secret-key" {
   type      = "hidden"
 }
 
+```
+
+### LB DNS Example
+```
+provider "aws" {  
+}
+
+provider "harbor" {
+  credentials = "${file("~/.harbor/credentials")}"
+}
+
+data "harbor_elb" "lb" {
+  shipment    = "ams-bleep-web"
+  environment = "prod"
+}
+
+resource "aws_route53_record" "root" {
+  zone_id = "${aws_route53_zone.bleepRoute53.zone_id}"
+  name    = "bleep.mydomain.com"
+  type    = "A"
+
+  alias {
+    name                   = "${data.harbor_elb.lb.dns_name}"
+    zone_id                = "${data.aws_elb_hosted_zone_id.region.id}"
+    evaluate_target_health = false
+  }
+}
 ```
 
 ### todo
