@@ -87,6 +87,8 @@ data "harbor_elb" "lb" {
   environment = "prod"
 }
 
+data "aws_elb_hosted_zone_id" "region" {}
+
 resource "aws_route53_record" "root" {
   zone_id = "${aws_route53_zone.bleepRoute53.zone_id}"
   name    = "bleep.mydomain.com"
