@@ -90,7 +90,7 @@ func dataSourceHarborElbRead(d *schema.ResourceData, meta interface{}) error {
 	if err != nil {
 		return fmt.Errorf("Error retrieving ELB: %s", awserr)
 	}
-	if describeResp == nil {
+	if describeResp == nil || describeResp.LoadBalancerDescriptions == nil || len(describeResp.LoadBalancerDescriptions) == 0 {
 		return errors.New("load balancer not found")
 	}
 
