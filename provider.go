@@ -76,7 +76,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	success, err := client.IsAuthenticated(auth.Username, auth.Token)
 	if err != nil {
 		if strings.Contains(err.Error(), "401 Unauthorized") {
-			return nil, errors.New("Expired token.  Please run harbor-compose login")
+			return nil, errors.New("Token has expired. Please run harbor-compose login")
 		}
 		return nil, err
 	}
