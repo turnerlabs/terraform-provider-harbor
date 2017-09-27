@@ -13,6 +13,7 @@ import (
 )
 
 const defaultBackendImage = "quay.io/turner/turner-defaultbackend:0.1.2"
+const defaultBackendHealthcheck = "/healthz"
 
 func resourceHarborShipmentEnv() *schema.Resource {
 	return &schema.Resource{
@@ -128,6 +129,7 @@ func resourceHarborShipmentEnv() *schema.Resource {
 									"ssl_management_type": &schema.Schema{
 										Type:     schema.TypeString,
 										Optional: true,
+										Default:  "iam",
 										ForceNew: true,
 									},
 									"private_key": &schema.Schema{
@@ -288,38 +290,74 @@ func resourceHarborShipmentEnvironmentExists(d *schema.ResourceData, meta interf
 //can assume resoure exists (since tf calls exists)
 //remote data should be updated into the local data
 func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
-	// auth := meta.(*Auth)
-	// shipment, env := getShipmentEnv(d)
-	// shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
-	// if shipmentEnv == nil {
-	// 	return errors.New("shipment/environment doesn't exist")
-	// }
+	auth := meta.(*Auth)
+	shipment, env := getShipmentEnv(d)
+	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
+	if shipmentEnv == nil {
+		return errors.New("shipment/environment doesn't exist")
+	}
 
-	// //transform shipit model back to terraform
-
-	// //set attributes
-	// d.Set("environment", shipmentEnv.Name)
-	// // d.Set("barge", result.Barge)
-	// // d.Set("replicas", result.Replicas)
+	//transform shipit model back to terraform
+	err := transformShipmentEnvironmentToTerraform(shipmentEnv, d)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-	// uri := fullyQualifiedInfrastructureURI("shipment/")
-	// res, _, err := gorequest.New().Put(uri).
-	// 	Set("x-username", meta.(*Auth).Username).
-	// 	Set("x-token", meta.(*Auth).Token).
-	// 	End()
-	// if err != nil {
-	// 	return err[0]
-	// }
-	// if res.StatusCode != 200 {
-	// 	return errors.New(uri + " create api returned " + strconv.Itoa(res.StatusCode))
-	// }
+//populate a terraform ResourceData from a shipit ShipmentEnvironment
+func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d *schema.ResourceData) error {
+
+	//set attributes
+	d.Set("environment", shipmentEnv.Name)
+	d.Set("monitored", shipmentEnv.EnableMonitoring)
+
+	provider := ec2Provider(shipmentEnv.Providers)
+	d.Set("barge", provider.Barge)
+	d.Set("replicas", provider.Replicas)
+
+	//[]map[string]interface{}
+	containers := make([]map[string]interface{}, len(shipmentEnv.Containers))
+	for i, container := range shipmentEnv.Containers {
+		c := make(map[string]interface{})
+		c["name"] = container.Name
+		containers[i] = c
+
+		//ports
+		ports := make([]map[string]interface{}, len(shipmentEnv.Containers[i].Ports))
+		for j, port := range shipmentEnv.Containers[i].Ports {
+			p := make(map[string]interface{})
+			p["primary"] = port.Primary
+			p["value"] = port.Value
+			p["public_port"] = port.PublicPort
+			p["public"] = port.PublicVip
+			p["external"] = port.External
+			p["protocol"] = port.Protocol
+			p["enable_proxy_protocol"] = port.EnableProxyProtocol
+			p["ssl_arn"] = port.SslArn
+			p["ssl_management_type"] = port.SslManagementType
+			//TODO:
+			//p["private_key"] = port.
+			//p["public_key_certificate"] = port.
+			//p["certificate_chain"] = port.
+			//TODO:
+			p["healthcheck"] = defaultBackendHealthcheck
+			ports[j] = p
+		}
+		c["port"] = ports
+	}
+	err := d.Set("container", containers)
+	if err != nil {
+		return err
+	}
+
+	//read hc settings from primary first container's port
+
 	return nil
 }
 
+//populate a shipit ShipmentEnvironment from a terraform ResourceData
 func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
 
 	result := ShipmentEnvironment{
@@ -380,7 +418,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group strin
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
 						p.External = portMap["external"].(bool)
 						//p.Healthcheck = portMap["healthcheck"].(string)
-						p.Healthcheck = "/healthz"
+						p.Healthcheck = defaultBackendHealthcheck
 						p.Primary = portMap["primary"].(bool)
 						p.PublicVip = portMap["public"].(bool)
 						p.SslArn = portMap["ssl_arn"].(string)
@@ -406,6 +444,11 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group strin
 	return &result, nil
 }
 
-func transformShipmentEnvironmentToTerraform(d *schema.ResourceData, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
-	return nil, nil
+//make updates to remote resource (use shipit bulk and trigger)
+func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
+
+	//transform terraform resource data to ShipmentEnvironment object and post to shipit
+	//transformTerraformToShipmentEnvironment()
+
+	return nil
 }
