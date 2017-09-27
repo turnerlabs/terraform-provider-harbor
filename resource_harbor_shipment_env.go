@@ -20,6 +20,7 @@ func resourceHarborShipmentEnv() *schema.Resource {
 		Read:   resourceHarborShipmentEnvironmentRead,
 		Update: resourceHarborShipmentEnvironmentUpdate,
 		Delete: resourceHarborShipmentEnvironmentDelete,
+		Exists: resourceHarborShipmentEnvironmentExists,
 
 		Schema: map[string]*schema.Schema{
 			"shipment": &schema.Schema{
@@ -175,6 +176,150 @@ func resourceHarborShipmentEnv() *schema.Resource {
 	}
 }
 
+func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
+	auth := meta.(*Auth)
+	shipmentName := d.Get("shipment").(string)
+	environment := d.Get("environment").(string)
+
+	//lookup the shipment in order to get the group/envvars (required for bulk creating env)
+	shipment := GetShipment(auth.Username, auth.Token, shipmentName)
+	if shipment == nil {
+		return errors.New("shipment not found")
+	}
+
+	//transform tf resource data into shipit model
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, shipment.Group, shipment.EnvVars)
+	if err != nil {
+		return err
+	}
+
+	//add auth
+	shipmentEnv.Username = auth.Username
+	shipmentEnv.Token = auth.Token
+
+	//debug print json
+	if Verbose {
+		b, _ := json.MarshalIndent(shipmentEnv, "\t", "\t")
+		log.Println(string(b))
+	}
+	//return errors.New("debug")
+
+	//post new shipment/environment
+	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+
+	//trigger shipment
+	success, messages := Trigger(shipmentName, environment)
+	if !success {
+		failureMessage := ""
+		for _, m := range messages {
+			failureMessage += m + "\n"
+		}
+		return fmt.Errorf("trigger failed: %v", failureMessage)
+	}
+
+	//poll lb endpoint until it's ready
+	var lbStatus *getLoadBalancerStatusResponse
+	for {
+		result, err := getLoadBalancerStatus(shipmentName, environment)
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			lbStatus = result
+			break
+		}
+		//wait a few seconds
+		time.Sleep(10 * time.Second)
+	}
+	if len(lbStatus.LoadBalancers) < 1 {
+		return errors.New("no load balancers")
+	}
+
+	//output id
+	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
+
+	//output attributes
+	d.Set("lb_name", lbStatus.LoadBalancers[0].LoadBalancerName)
+	d.Set("lb_type", lbStatus.LoadBalancers[0].Type)
+	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
+	d.Set("lb_dns_name", lbStatus.LoadBalancers[0].DNSName)
+	d.Set("lb_hosted_zone_id", lbStatus.LoadBalancers[0].CanonicalHostedZoneID)
+
+	return nil
+}
+
+func getShipmentEnv(d *schema.ResourceData) (string, string) {
+	parts := strings.Split(d.Id(), "::")
+	return parts[0], parts[1]
+}
+
+func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
+	auth := meta.(*Auth)
+	shipment, env := getShipmentEnv(d)
+
+	//set replicas to 0 and trigger
+	provider := ProviderPayload{
+		Name:     providerEc2,
+		Replicas: 0,
+	}
+	UpdateProvider(auth.Username, auth.Token, shipment, env, provider)
+
+	//trigger shipment
+	Trigger(shipment, env)
+
+	//now delete from shipit
+	DeleteShipmentEnvironment(auth.Username, auth.Token, shipment, env)
+
+	return nil
+}
+
+//has the resource been deleted outside of terraform?
+func resourceHarborShipmentEnvironmentExists(d *schema.ResourceData, meta interface{}) (bool, error) {
+	auth := meta.(*Auth)
+	shipment, env := getShipmentEnv(d)
+	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
+	if shipmentEnv == nil {
+		d.SetId("")
+		return false, nil
+	}
+	return true, nil
+}
+
+//can assume resoure exists (since tf calls exists)
+//remote data should be updated into the local data
+func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
+	// auth := meta.(*Auth)
+	// shipment, env := getShipmentEnv(d)
+	// shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
+	// if shipmentEnv == nil {
+	// 	return errors.New("shipment/environment doesn't exist")
+	// }
+
+	// //transform shipit model back to terraform
+
+	// //set attributes
+	// d.Set("environment", shipmentEnv.Name)
+	// // d.Set("barge", result.Barge)
+	// // d.Set("replicas", result.Replicas)
+
+	return nil
+}
+
+func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
+	// uri := fullyQualifiedInfrastructureURI("shipment/")
+	// res, _, err := gorequest.New().Put(uri).
+	// 	Set("x-username", meta.(*Auth).Username).
+	// 	Set("x-token", meta.(*Auth).Token).
+	// 	End()
+	// if err != nil {
+	// 	return err[0]
+	// }
+	// if res.StatusCode != 200 {
+	// 	return errors.New(uri + " create api returned " + strconv.Itoa(res.StatusCode))
+	// }
+	return nil
+}
+
 func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
 
 	result := ShipmentEnvironment{
@@ -261,148 +406,6 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group strin
 	return &result, nil
 }
 
-func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(*Auth)
-	shipmentName := d.Get("shipment").(string)
-	environment := d.Get("environment").(string)
-
-	//lookup the shipment in order to get the group/envvars (required for bulk creating env)
-	shipment := GetShipment(auth.Username, auth.Token, shipmentName)
-	if shipment == nil {
-		return errors.New("shipment not found")
-	}
-
-	//transform tf resource data into shipit model
-	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, shipment.Group, shipment.EnvVars)
-	if err != nil {
-		return err
-	}
-
-	//add auth
-	shipmentEnv.Username = auth.Username
-	shipmentEnv.Token = auth.Token
-
-	//debug print json
-	if Verbose {
-		b, _ := json.MarshalIndent(shipmentEnv, "\t", "\t")
-		log.Println(string(b))
-	}
-	//return errors.New("debug")
-
-	//post new shipment/environment
-	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
-
-	//trigger shipment
-	success, messages := Trigger(shipmentName, environment)
-	if !success {
-		failureMessage := ""
-		for _, m := range messages {
-			failureMessage += m + "\n"
-		}
-		return fmt.Errorf("trigger failed: %v", failureMessage)
-	}
-
-	//poll lb endpoint until it's ready
-	var lbStatus *getLoadBalancerStatusResponse
-	for {
-		result, err := getLoadBalancerStatus(shipmentName, environment)
-		if err != nil {
-			return err
-		}
-		if result != nil {
-			lbStatus = result
-			break
-		}
-		//wait a few seconds
-		time.Sleep(10 * time.Second)
-	}
-	if len(lbStatus.LoadBalancers) < 1 {
-		return errors.New("no load balancers")
-	}
-
-	//output id
-	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
-
-	//output attributes
-	d.Set("lb_name", lbStatus.LoadBalancers[0].LoadBalancerName)
-	d.Set("lb_type", lbStatus.LoadBalancers[0].Type)
-	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
-	d.Set("lb_dns_name", lbStatus.LoadBalancers[0].DNSName)
-	d.Set("lb_hosted_zone_id", lbStatus.LoadBalancers[0].CanonicalHostedZoneID)
-
-	return nil
-}
-
-func getShipmentEnv(id string) (string, string) {
-	parts := strings.Split(id, "::")
-	return parts[0], parts[1]
-}
-
-func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(*Auth)
-	shipment, env := getShipmentEnv(d.Id())
-
-	//set replicas to 0 and trigger
-	provider := ProviderPayload{
-		Name:     providerEc2,
-		Replicas: 0,
-	}
-	UpdateProvider(auth.Username, auth.Token, shipment, env, provider)
-
-	//trigger shipment
-	Trigger(shipment, env)
-
-	//now delete from shipit
-	DeleteShipmentEnvironment(auth.Username, auth.Token, shipment, env)
-
-	return nil
-}
-
-func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-	// uri := fullyQualifiedInfrastructureURI("shipment/")
-	// res, _, err := gorequest.New().Put(uri).
-	// 	Set("x-username", meta.(*Auth).Username).
-	// 	Set("x-token", meta.(*Auth).Token).
-	// 	End()
-	// if err != nil {
-	// 	return err[0]
-	// }
-	// if res.StatusCode != 200 {
-	// 	return errors.New(uri + " create api returned " + strconv.Itoa(res.StatusCode))
-	// }
-	return nil
-}
-
-func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
-	// if d.Id() == "" {
-	// 	return nil
-	// }
-
-	// //todo: lookup shipment/env by id (shipment::env)
-
-	// auth := meta.(*Auth)
-	// GetShipmentEnvironment(auth.Username, auth.Token, d.Id())
-
-	// uri := fullyQualifiedInfrastructureURI(d.Id())
-	// res, body, err := gorequest.New().Get(uri).EndBytes()
-	// if err != nil {
-	// 	return err[0]
-	// }
-	// if res.StatusCode == 404 {
-	// 	return nil
-	// } else if res.StatusCode != 200 {
-	// 	return errors.New("get environment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
-	// }
-
-	// var result ShipmentEnv
-	// unmarshalErr := json.Unmarshal(body, &result)
-	// if unmarshalErr != nil {
-	// 	return unmarshalErr
-	// }
-
-	// d.Set("environment", result.Environment)
-	// d.Set("barge", result.Barge)
-	// d.Set("replicas", result.Replicas)
-
-	return nil
+func transformShipmentEnvironmentToTerraform(d *schema.ResourceData, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
+	return nil, nil
 }
