@@ -1,13 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"strconv"
+	"net/http"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/parnurzeal/gorequest"
 )
 
 func resourceHarborShipment() *schema.Resource {
@@ -31,95 +28,108 @@ func resourceHarborShipment() *schema.Resource {
 	}
 }
 
-type shipmentPayload struct {
-	Name  string `json:"name,omitempty"`
-	Group string `json:"group,omitempty"`
-}
-
 func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) error {
+	auth := meta.(*Auth)
 
-	data := shipmentPayload{
+	shipment := Shipment{
 		Name:  d.Get("shipment").(string),
 		Group: d.Get("group").(string),
 	}
 
 	//POST /v1/shipments
-	err := create("shipments", meta.(*Auth), data)
-	if err != nil {
-		return err
+	uri := shipitURI("/v1/shipments")
+	res, _, err := create(auth.Username, auth.Token, uri, shipment)
+	if err != nil && len(err) > 0 {
+		return err[0]
+	}
+	if res.StatusCode != http.StatusCreated {
+		check(errors.New("unable to create shipment"))
 	}
 
-	id := fmt.Sprintf("shipment/%s", data.Name)
-
 	//create the required shipment envvar for customer/group
-	customerEnvVar := envVarPayload{
+	customerEnvVar := EnvVarPayload{
 		Name:  "CUSTOMER",
-		Value: data.Group,
+		Value: shipment.Group,
 	}
 
 	//POST /v1/shipment/:Shipment/envVars
-	err = create(id+"/envVars", meta.(*Auth), customerEnvVar)
-	if err != nil {
-		return err
-	}
-
-	//use the uri fragment as the id (shipment/foo)
-	d.SetId(id)
-
-	return nil
-}
-
-func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error {
-
-	uri := fullyQualifiedURI(d.Id())
-	res, body, err := gorequest.New().Get(uri).EndBytes()
-	if err != nil {
+	uri = shipitURI("/v1/shipment/{shipment}/envVars", param("shipment", shipment.Name))
+	res, _, err = create(auth.Username, auth.Token, uri, customerEnvVar)
+	if err != nil && len(err) > 0 {
 		return err[0]
 	}
-	if res.StatusCode == 404 {
-		return nil
-	} else if res.StatusCode != 200 {
-		return errors.New("get shipment api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
+	if res.StatusCode != http.StatusCreated {
+		return errors.New("unable to create shipment")
 	}
 
-	var result shipmentPayload
-	unmarshalErr := json.Unmarshal(body, &result)
-	if unmarshalErr != nil {
-		return unmarshalErr
-	}
-
-	d.Set("group", result.Group)
+	d.SetId(shipment.Name)
 
 	return nil
 }
 
 func resourceHarborShipmentDelete(d *schema.ResourceData, meta interface{}) error {
-	//todo: cleanup -> set replicas=0/trigger
-	//customer envvar should get cascade deleted
-	return delete(d.Id(), meta.(*Auth))
+	auth := meta.(*Auth)
+	uri := shipitURI("/v1/shipment/{shipment}", param("shipment", d.Id()))
+	res, _, err := deleteHTTP(auth.Username, auth.Token, uri)
+	if res.StatusCode != http.StatusOK {
+		return errors.New("shipment delete failed")
+	}
+	if err != nil && len(err) > 0 {
+		return err[0]
+	}
+	return nil
 }
 
 func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) error {
+	auth := meta.(*Auth)
 
 	if d.HasChange("group") {
 
-		data := shipmentPayload{
+		data := Shipment{
 			Group: d.Get("group").(string),
 		}
 
 		//update the required shipment envvar for customer/group
-		customerEnvVar := envVarPayload{
+		customerEnvVar := EnvVarPayload{
 			Value: data.Group,
 		}
 
-		uri := d.Id() + "/envVar/CUSTOMER"
-		err := update(uri, meta.(*Auth), customerEnvVar)
-		if err != nil {
-			return err
+		uri := shipitURI("/v1/shipment/{shipment}/envVar/{envVar}",
+			param("shipment", d.Id()),
+			param("envVar", "CUSTOMER"))
+		res, _, err := update(auth.Username, auth.Token, uri, customerEnvVar)
+		if res.StatusCode != http.StatusOK {
+			return errors.New("shipment envvar update failed")
+		}
+		if err != nil && len(err) > 0 {
+			return err[0]
 		}
 
-		//update the shipment
-		return update(d.Id(), meta.(*Auth), data)
+		//now update the shipment
+		uri = shipitURI("/v1/shipment/{shipment}", param("shipment", d.Id()))
+		res, _, err = update(auth.Username, auth.Token, uri, data)
+		if res.StatusCode != http.StatusOK {
+			return errors.New("shipment update failed")
+		}
+		if err != nil && len(err) > 0 {
+			return err[0]
+		}
 	}
+	return nil
+}
+
+func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error {
+	if d.Id() == "" {
+		return nil
+	}
+
+	auth := meta.(*Auth)
+	shipment := GetShipment(auth.Username, auth.Token, d.Id())
+	if shipment == nil {
+		return nil
+	}
+
+	d.Set("group", shipment.Group)
+
 	return nil
 }

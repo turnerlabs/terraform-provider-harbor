@@ -5,6 +5,9 @@ import (
 	"github.com/hashicorp/terraform/terraform"
 )
 
+//Verbose ...
+var Verbose = true
+
 func main() {
 	plugin.Serve(&plugin.ServeOpts{
 		ProviderFunc: func() terraform.ResourceProvider {

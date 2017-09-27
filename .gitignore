@@ -8,3 +8,8 @@ trigger.md
 docker-compose.yml
 harbor-compose.yml
 terraform-provider-harbor.exe
+vendor
+test-server/test-server
+.vscode
+flow.md
+z.log
