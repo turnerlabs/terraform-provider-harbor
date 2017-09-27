@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
-const defaultBackendImage = "quay.io/turner/turner-defaultbackend:0.1.0"
+const defaultBackendImage = "quay.io/turner/turner-defaultbackend:0.1.2"
 
 func resourceHarborShipmentEnv() *schema.Resource {
 	return &schema.Resource{
