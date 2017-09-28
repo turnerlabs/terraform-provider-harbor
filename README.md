@@ -45,7 +45,7 @@ resource "harbor_shipment_env" "prod" {
       protocol     = "https"
       public_port  = 443
       value        = 3000
-      aws_arn      = "${var.aws_acm_certificate.my-app.arn}"
+      aws_arn      = "${aws_acm_certificate.my-app.arn}"
     }
 
     port {
@@ -65,7 +65,7 @@ resource "harbor_shipment_env" "prod" {
 
 data "aws_elb_hosted_zone_id" "region" {}
 
-resource "aws_route53_record" "root" {
+resource "aws_route53_record" "app" {
   zone_id = "${aws_route53_zone.my_app.zone_id}"
   name    = "my-app.turnerapps.com"
   type    = "A"
@@ -77,7 +77,7 @@ resource "aws_route53_record" "root" {
   }
 }
 
-data "aws_acm_certificate" "my-app" {
+data "aws_acm_certificate" "app" {
   domain   = "my-app.turnerapps.com"
   statuses = ["ISSUED"]
 }
