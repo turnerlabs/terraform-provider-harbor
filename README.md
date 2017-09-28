@@ -3,12 +3,12 @@ terraform-provider-harbor
 
 A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://github.com/turnerlabs/harbor) resources.
 
-
 Benefits:
 
 - infrastructure as code (versionable and reproducible infrastructure)
 - all of your infrastructure declared in a single place, format, command
 - native integration with the vast landscape of existing terraform providers
+- user doesn't have to understand idiosyncrasies of shipit and trigger what types of changes require setting replicas = 0 and triggering
 - outputs managed load balancer information for integration with route 53
 - aws role integration
 - tag integration
@@ -24,13 +24,13 @@ provider "harbor" {
 }
 
 resource "harbor_shipment" "app" {
-  shipment = "mss-poc-terraform"
+  shipment = "my-app"
   group    = "my-team"
 }
 
 resource "harbor_shipment_env" "prod" {
   shipment             = "${harbor_shipment.app.id}"
-  environment          = "dev"
+  environment          = "prod"
   barge                = "ent-prod"
   replicas             = 3
   monitored            = false
@@ -38,15 +38,23 @@ resource "harbor_shipment_env" "prod" {
   healthcheck_interval = 10
 
   container {
-    name = "container"
+    name = "my-app"
+    
+    port {
+      name         = "PORT"
+      protocol     = "https"
+      public_port  = 443
+      value        = 3000
+      aws_arn      = "${var.aws_acm_certificate.my-app.arn}"
+    }
 
     port {
       name         = "PORT"
       protocol     = "http"
-      value        = 3000
       public_port  = 80
+      value        = 5000
       health_check = "/health"
-    }
+    }    
   }  
   
   logShipping {
@@ -67,5 +75,10 @@ resource "aws_route53_record" "root" {
     zone_id                = "${data.aws_elb_hosted_zone_id.region.id}"
     evaluate_target_health = false
   }
+}
+
+data "aws_acm_certificate" "my-app" {
+  domain   = "my-app.turnerapps.com"
+  statuses = ["ISSUED"]
 }
 ```
