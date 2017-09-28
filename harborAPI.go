@@ -565,6 +565,30 @@ func SaveNewShipmentEnvironment(username string, token string, shipment Shipment
 	return true
 }
 
+// SaveExistingShipmentEnvironment bulk saves a new shipment/environment
+func SaveExistingShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) bool {
+
+	var config = GetConfig()
+	shipment.Username = username
+	shipment.Token = token
+
+	//PUT /api/v1/shipments
+	res, body, err := update(username, token, config.ShipitURI+"/v1/bulk/shipments", shipment)
+
+	if err != nil || res.StatusCode != http.StatusCreated {
+		fmt.Printf("updating shipment was not successful: %v\ncode: %v\n", body, res.StatusCode)
+		return false
+	}
+
+	//api returns an object with an errors property that is
+	//false when there are no errors and an object if there are
+	if !strings.Contains(body, "errors\": false") {
+		return false
+	}
+
+	return true
+}
+
 // DeleteShipmentEnvironment deletes a shipment/environment from harbor
 func DeleteShipmentEnvironment(username string, token string, shipment string, env string) {
 

@@ -250,14 +250,14 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	return nil
 }
 
-func getShipmentEnv(d *schema.ResourceData) (string, string) {
-	parts := strings.Split(d.Id(), "::")
+func idParts(id string) (string, string) {
+	parts := strings.Split(id, "::")
 	return parts[0], parts[1]
 }
 
 func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
 	auth := meta.(*Auth)
-	shipment, env := getShipmentEnv(d)
+	shipment, env := idParts(d.Id())
 
 	//set replicas to 0 and trigger
 	provider := ProviderPayload{
@@ -278,7 +278,7 @@ func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interf
 //has the resource been deleted outside of terraform?
 func resourceHarborShipmentEnvironmentExists(d *schema.ResourceData, meta interface{}) (bool, error) {
 	auth := meta.(*Auth)
-	shipment, env := getShipmentEnv(d)
+	shipment, env := idParts(d.Id())
 	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
 	if shipmentEnv == nil {
 		d.SetId("")
@@ -291,7 +291,7 @@ func resourceHarborShipmentEnvironmentExists(d *schema.ResourceData, meta interf
 //remote data should be updated into the local data
 func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 	auth := meta.(*Auth)
-	shipment, env := getShipmentEnv(d)
+	shipment, env := idParts(d.Id())
 	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
 	if shipmentEnv == nil {
 		return errors.New("shipment/environment doesn't exist")
@@ -301,6 +301,49 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 	err := transformShipmentEnvironmentToTerraform(shipmentEnv, d)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+//make updates to remote resource (use shipit bulk and trigger)
+func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
+	auth := meta.(*Auth)
+	shipmentName, env := idParts(d.Id())
+
+	//lookup the shipment in order to get the group/envvars (required for bulk creating env)
+	shipment := GetShipment(auth.Username, auth.Token, shipmentName)
+	if shipment == nil {
+		return errors.New("shipment not found")
+	}
+
+	//transform tf resource data into shipit model
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, shipment.Group, shipment.EnvVars)
+	if err != nil {
+		return err
+	}
+
+	//add auth
+	shipmentEnv.Username = auth.Username
+	shipmentEnv.Token = auth.Token
+
+	//debug print json
+	if Verbose {
+		b, _ := json.MarshalIndent(shipmentEnv, "\t", "\t")
+		log.Println(string(b))
+	}
+
+	//post new shipment/environment
+	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+
+	//trigger shipment
+	success, messages := Trigger(shipmentName, env)
+	if !success {
+		failureMessage := ""
+		for _, m := range messages {
+			failureMessage += m + "\n"
+		}
+		return fmt.Errorf("trigger failed: %v", failureMessage)
 	}
 
 	return nil
@@ -442,13 +485,4 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, group strin
 	}
 
 	return &result, nil
-}
-
-//make updates to remote resource (use shipit bulk and trigger)
-func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-
-	//transform terraform resource data to ShipmentEnvironment object and post to shipit
-	//transformTerraformToShipmentEnvironment()
-
-	return nil
 }
