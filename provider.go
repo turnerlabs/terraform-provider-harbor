@@ -84,5 +84,15 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, errors.New("auth failed")
 	}
 
-	return &auth, nil
+	meta := harborMeta{
+		auth:  &auth,
+		state: make(map[string]interface{}),
+	}
+
+	return &meta, nil
+}
+
+type harborMeta struct {
+	auth  *Auth
+	state map[string]interface{}
 }
