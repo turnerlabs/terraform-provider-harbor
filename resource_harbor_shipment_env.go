@@ -13,7 +13,7 @@ import (
 )
 
 const defaultBackendImageName = "quay.io/turner/turner-defaultbackend"
-const defaultBackendImageVersion = "0.1.2"
+const defaultBackendImageVersion = "0.2.0"
 
 func resourceHarborShipmentEnv() *schema.Resource {
 	return &schema.Resource{
@@ -154,6 +154,10 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				},
 			},
 			//attributes
+			"dns_name": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"lb_name": &schema.Schema{
 				Type:     schema.TypeString,
 				Computed: true,
@@ -250,6 +254,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
 
 	//output attributes
+	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipmentName, environment))
 	d.Set("lb_name", lbStatus.LoadBalancers[0].LoadBalancerName)
 	d.Set("lb_type", lbStatus.LoadBalancers[0].Type)
 	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
@@ -389,6 +394,9 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("environment", shipmentEnv.Name)
 	d.Set("monitored", shipmentEnv.EnableMonitoring)
 
+	d.Set("healthcheck_timeout", shipmentEnv.Containers[0].Ports[0].HealthcheckTimeout)
+	d.Set("healthcheck_interval", shipmentEnv.Containers[0].Ports[0].HealthcheckInterval)
+
 	provider := ec2Provider(shipmentEnv.Providers)
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
@@ -426,8 +434,6 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	if err != nil {
 		return err
 	}
-
-	//read hc settings from primary first container's port
 
 	return nil
 }
@@ -501,10 +507,15 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 
 							result.Containers[i].Image = fmt.Sprintf("%v:%v", defaultBackendImageName, defaultBackendImageVersion)
 
-							//add PORT env var required by default backend image
-							result.Containers[i].EnvVars = make([]EnvVarPayload, 1)
+							result.Containers[i].EnvVars = make([]EnvVarPayload, 2)
+
+							//configure default backend to use user's port
 							result.Containers[i].EnvVars[0].Name = "PORT"
-							result.Containers[i].EnvVars[0].Value = strconv.Itoa(portMap["value"].(int))
+							result.Containers[i].EnvVars[0].Value = strconv.Itoa(p.Value)
+
+							//configure default backend to use user's health check route
+							result.Containers[i].EnvVars[1].Name = "HEALTHCHECK"
+							result.Containers[i].EnvVars[1].Value = p.Healthcheck
 						}
 
 						//map hc settings down to all ports
