@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	harborauth "github.com/turnerlabs/harbor-auth-client"
@@ -12,9 +13,14 @@ import (
 
 var authURI = "https://auth.services.dmtio.net"
 var shipItURI = "http://shipit.services.dmtio.net/v1"
+var infrastructureURI = "http://localhost:8080/api"
 
 func fullyQualifiedURI(id string) string {
 	return fmt.Sprintf("%s/%s", shipItURI, id)
+}
+
+func fullyQualifiedInfrastructureURI(id string) string {
+	return fmt.Sprintf("%s/%s", infrastructureURI, id)
 }
 
 //Auth struct
@@ -35,11 +41,8 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"harbor_shipment":             resourceHarborShipment(),
-			"harbor_shipment_environment": resourceHarborShipmentEnvironment(),
-			"harbor_container":            resourceHarborContainer(),
-			"harbor_port":                 resourceHarborPort(),
-			"harbor_envvar":               resourceHarborEnvvar(),
+			"harbor_shipment":     resourceHarborShipment(),
+			"harbor_shipment_env": resourceHarborShipmentEnv(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"harbor_elb": dataSourceHarborElb(),
@@ -70,13 +73,26 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, err
 	}
 
-	isAuth, err := client.IsAuthenticated(auth.Username, auth.Token)
+	success, err := client.IsAuthenticated(auth.Username, auth.Token)
 	if err != nil {
+		if strings.Contains(err.Error(), "401 Unauthorized") {
+			return nil, errors.New("Token has expired. Please run harbor-compose login")
+		}
 		return nil, err
 	}
-	if !isAuth {
-		return nil, errors.New("token is not valid")
+	if !success {
+		return nil, errors.New("auth failed")
 	}
 
-	return &auth, nil
+	meta := harborMeta{
+		auth:  &auth,
+		state: make(map[string]interface{}),
+	}
+
+	return &meta, nil
+}
+
+type harborMeta struct {
+	auth  *Auth
+	state map[string]interface{}
 }
