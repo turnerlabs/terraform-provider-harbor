@@ -1,0 +1,40 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/turnerlabs/terraform-provider-harbor
+    docker:
+      - image: circleci/golang:1.8.1
+        environment:
+          GHR_VERSION: v0.5.4
+    steps:
+      - checkout
+      - run: go get github.com/golang/dep/cmd/dep
+      - run: dep ensure -v
+      - run: go get github.com/jstemmer/go-junit-report
+      - run: wget https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/ghr_${GHR_VERSION}_linux_amd64.zip && sudo unzip ghr_${GHR_VERSION}_linux_amd64.zip -d /usr/local/bin
+      - run: go vet      
+      - run:
+          name: Run unit tests
+          command: |
+            trap "go-junit-report <./go-test.out > ./go-test-report.xml" EXIT
+            go test -v | tee ./go-test.out
+      - run: 
+          name: compile
+          command: |
+            GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -v -o dist/darwin_amd64
+            GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -v -o dist/linux_amd64
+            GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -v -o dist/windows_amd64            
+      - run: 
+          name: publish binary pre-release to github
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "develop" ]; then
+              ghr --prerelease -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME --replace `git describe --tags` dist/
+            fi
+      - run: 
+          name: publish binary release to github
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              ghr -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME --replace `git describe --tags` dist/
+            fi            
+      - store_test_results:
+          path: ./go-test-report.xml
