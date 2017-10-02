@@ -13,3 +13,4 @@ test-server/test-server
 .vscode
 flow.md
 z.log
+build.sh
