@@ -17,6 +17,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 - works with changes made in GUI or CLI
 - leverages terraform's first class support state synchronization
 
+[![asciicast](https://asciinema.org/a/d0WZRJuwOsLwVUkL9AgePWxNH.png)](https://asciinema.org/a/d0WZRJuwOsLwVUkL9AgePWxNH)
 
 ### Installation
 
