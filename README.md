@@ -11,7 +11,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 - user doesn't have to understand idiosyncrasies of ShipIt and Trigger, and what types of changes require setting replicas = 0 and triggering
 - HTTPS/TLS setup via IaC
 - AWS Tag integration
-- AWS Route53 integration (outputs managed load balancer information)b
+- AWS Route53 integration (outputs managed load balancer information)
 - AWS ACM integration
 - AWS Role integration (coming)
 - works with changes made in GUI or CLI
@@ -22,7 +22,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 
 - install plugin binary
 ```
-curl -sSL https://github.com/turnerlabs/terraform-provider-harbor/blob/master/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/turnerlabs/terraform-provider-harbor/master/install.sh | sh
 ```
 
 - install [harbor-compose](https://github.com/turnerlabs/harbor-compose) binary (required for authentication)
