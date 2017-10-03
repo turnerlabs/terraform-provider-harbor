@@ -70,3 +70,7 @@ output "dns_name" {
   value = "${harbor_shipment_env.dev.dns_name}"
 }
 ```
+
+### Other examples
+
+- [DNS and SSL](examples/dns-ssl)
