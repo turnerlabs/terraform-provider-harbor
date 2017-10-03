@@ -3,6 +3,7 @@ terraform-provider-harbor
 *.tfstate.backup
 .terraform
 main.tf
+!examples/dns-ssl/main.tf
 test
 trigger.md
 docker-compose.yml
