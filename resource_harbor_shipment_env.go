@@ -47,14 +47,6 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
-			"healthcheck_timeout": &schema.Schema{
-				Type:     schema.TypeInt,
-				Optional: true,
-			},
-			"healthcheck_interval": &schema.Schema{
-				Type:     schema.TypeInt,
-				Optional: true,
-			},
 			"container": &schema.Schema{
 				Description: "The list of containers for this shipment environment",
 				Optional:    true,
@@ -68,6 +60,21 @@ func resourceHarborShipmentEnv() *schema.Resource {
 							Type:     schema.TypeString,
 							Optional: true,
 							ForceNew: true,
+						},
+						"healthcheck": &schema.Schema{
+							Type:     schema.TypeString,
+							Required: true,
+							ForceNew: true,
+						},
+						"healthcheck_timeout": &schema.Schema{
+							Type:     schema.TypeInt,
+							Optional: true,
+							Default:  1,
+						},
+						"healthcheck_interval": &schema.Schema{
+							Type:     schema.TypeInt,
+							Optional: true,
+							Default:  10,
 						},
 						"port": {
 							Optional: true,
@@ -107,12 +114,6 @@ func resourceHarborShipmentEnv() *schema.Resource {
 										Type:     schema.TypeBool,
 										Optional: true,
 										Default:  true,
-										ForceNew: true,
-									},
-									"healthcheck": &schema.Schema{
-										Type:     schema.TypeString,
-										Optional: true,
-										Default:  "",
 										ForceNew: true,
 									},
 									"enable_proxy_protocol": &schema.Schema{
@@ -217,7 +218,6 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		b, _ := json.MarshalIndent(shipmentEnv, "\t", "\t")
 		log.Println(string(b))
 	}
-	//return errors.New("debug")
 
 	//post new shipment/environment
 	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
@@ -346,17 +346,10 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		return errors.New("shipment not found")
 	}
 
-	//is there an existing image to apply?
-	existingImage := ""
-	if meta.(*harborMeta).state["image"] != nil {
-		existingImage = meta.(*harborMeta).state["image"].(string)
-		if Verbose {
-			log.Println("existing image = " + existingImage)
-		}
-	}
+	//TODO: always use the currently deployed images in an update
 
 	//transform tf resource data into shipit model
-	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, existingImage, shipment.Group, shipment.EnvVars)
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, "", shipment.Group, shipment.EnvVars)
 	if err != nil {
 		return err
 	}
@@ -371,7 +364,7 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		log.Println(string(b))
 	}
 
-	//post new shipment/environment
+	//post shipment/environment
 	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
 
 	//trigger shipment
@@ -394,9 +387,6 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("environment", shipmentEnv.Name)
 	d.Set("monitored", shipmentEnv.EnableMonitoring)
 
-	d.Set("healthcheck_timeout", shipmentEnv.Containers[0].Ports[0].HealthcheckTimeout)
-	d.Set("healthcheck_interval", shipmentEnv.Containers[0].Ports[0].HealthcheckInterval)
-
 	provider := ec2Provider(shipmentEnv.Providers)
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
@@ -409,6 +399,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 		containers[i] = c
 
 		//ports
+		var primaryPort *PortPayload
 		ports := make([]map[string]interface{}, len(shipmentEnv.Containers[i].Ports))
 		for j, port := range shipmentEnv.Containers[i].Ports {
 			p := make(map[string]interface{})
@@ -418,7 +409,6 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			p["public"] = port.PublicVip
 			p["external"] = port.External
 			p["protocol"] = port.Protocol
-			p["healthcheck"] = port.Healthcheck
 			p["enable_proxy_protocol"] = port.EnableProxyProtocol
 			p["ssl_arn"] = port.SslArn
 			p["ssl_management_type"] = port.SslManagementType
@@ -427,8 +417,25 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			//p["public_key_certificate"] = port.
 			//p["certificate_chain"] = port.
 			ports[j] = p
+
+			if port.Primary {
+				primaryPort = &port
+			}
 		}
 		c["port"] = ports
+
+		//copy healthcheck settings from primary port to container
+		if primaryPort != nil {
+			if primaryPort.Healthcheck != "" {
+				c["healthcheck"] = primaryPort.Healthcheck
+			}
+			if primaryPort.HealthcheckTimeout != nil {
+				c["healthcheck_timeout"] = *primaryPort.HealthcheckTimeout
+			}
+			if primaryPort.HealthcheckInterval != nil {
+				c["healthcheck_interval"] = *primaryPort.HealthcheckInterval
+			}
+		}
 	}
 	err := d.Set("container", containers)
 	if err != nil {
@@ -471,10 +478,12 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 			result.Containers[i].Name = ctr["name"].(string)
 			result.Containers[i].Image = existingImage
 
-			//map ports
-			hcTimeout := d.Get("healthcheck_timeout").(int)
-			hcInterval := d.Get("healthcheck_interval").(int)
+			//copy container healthcheck settings down to all ports
+			healthcheck := ctr["healthcheck"].(string)
+			hcTimeout := ctr["healthcheck_timeout"].(int)
+			hcInterval := ctr["healthcheck_interval"].(int)
 
+			//map ports
 			if portsResource, ok := ctr["port"].([]interface{}); ok && len(portsResource) > 0 {
 				currentContainer := &result.Containers[i]
 				currentContainer.Ports = make([]PortPayload, len(portsResource))
@@ -489,7 +498,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 						}
 						p.Protocol = portMap["protocol"].(string)
 						p.Value = portMap["value"].(int)
-						p.Healthcheck = portMap["healthcheck"].(string)
+						p.Healthcheck = healthcheck
 						p.PublicPort = portMap["public_port"].(int)
 						p.External = portMap["external"].(bool)
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
@@ -515,7 +524,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 
 							//configure default backend to use user's health check route
 							result.Containers[i].EnvVars[1].Name = "HEALTHCHECK"
-							result.Containers[i].EnvVars[1].Value = p.Healthcheck
+							result.Containers[i].EnvVars[1].Value = healthcheck
 						}
 
 						//map hc settings down to all ports
