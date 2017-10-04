@@ -30,11 +30,12 @@ resource "harbor_shipment_env" "dev" {
   barge                = "${var.barge}"
   replicas             = 4
   monitored            = false
-  healthcheck_timeout  = 1
-  healthcheck_interval = 10
 
   container {
-    name = "${var.app}"
+    name                 = "${var.app}"
+    healthcheck          = "/health"
+    healthcheck_timeout  = 1
+    healthcheck_interval = 10
 
     port {
       primary             = "true"
@@ -43,7 +44,7 @@ resource "harbor_shipment_env" "dev" {
       value               = 5000
       healthcheck         = "/health"
       ssl_management_type = "acm"
-      ssl_arn             = "${data.aws_acm_certificate.app.arn}"      
+      ssl_arn             = "${data.aws_acm_certificate.app.arn}"
     }
   }
 }

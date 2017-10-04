@@ -45,23 +45,21 @@ resource "harbor_shipment" "app" {
 }
 
 resource "harbor_shipment_env" "dev" {
-  shipment             = "${harbor_shipment.app.id}"
-  environment          = "dev"
-  barge                = "digital-sandbox"
-  replicas             = 4
-  monitored            = false
-  healthcheck_timeout  = 1
-  healthcheck_interval = 10
+  shipment    = "${harbor_shipment.app.id}"
+  environment = "dev"
+  barge       = "digital-sandbox"
+  replicas    = 4
+  monitored   = false
 
   container {
-    name = "my-app"
+    name        = "my-app"
+    healthcheck = "/health"
 
     port {
       primary     = true
       protocol    = "http"
       public_port = 80
       value       = 5000
-      healthcheck = "/health"
     }
   }
 }
