@@ -84,8 +84,9 @@ func resourceHarborShipmentEnv() *schema.Resource {
 								Schema: map[string]*schema.Schema{
 									"primary": &schema.Schema{
 										Type:     schema.TypeBool,
-										Required: true,
 										ForceNew: true,
+										Optional: true,
+										Default:  false,
 									},
 									"protocol": &schema.Schema{
 										Type:     schema.TypeString,
@@ -184,7 +185,9 @@ func resourceHarborShipmentEnv() *schema.Resource {
 }
 
 func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(*harborMeta).auth
+	harborMeta := meta.(*harborMeta)
+	auth := harborMeta.auth
+
 	shipmentName := d.Get("shipment").(string)
 	environment := d.Get("environment").(string)
 
@@ -194,17 +197,8 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		return errors.New("shipment not found")
 	}
 
-	//is there an existing image to apply?
-	existingImage := ""
-	if meta.(*harborMeta).state["image"] != nil {
-		existingImage = meta.(*harborMeta).state["image"].(string)
-		if Verbose {
-			log.Println("existing image = " + existingImage)
-		}
-	}
-
 	//transform tf resource data into shipit model
-	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, existingImage, shipment.Group, shipment.EnvVars)
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, harborMeta.existingShipmentEnvironment, shipment.Group, shipment.EnvVars)
 	if err != nil {
 		return err
 	}
@@ -219,8 +213,10 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		log.Println(string(b))
 	}
 
-	//post new shipment/environment
-	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	//log.Fatal("debug")
+
+	//save shipment/environment
+	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
 
 	//trigger shipment
 	success, messages := Trigger(shipmentName, environment)
@@ -292,14 +288,9 @@ func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interf
 	//now delete from shipit
 	DeleteShipmentEnvironment(auth.Username, auth.Token, shipment, env)
 
-	//if deleting a shipment/env with an image other than the default backend,
-	//then save the image to apply to creates in this same transaction
-	if !strings.HasPrefix(shipmentEnv.Containers[0].Image, defaultBackendImageName) {
-		harborMeta.state["image"] = shipmentEnv.Containers[0].Image
-		if Verbose {
-			log.Println("setting image = " + shipmentEnv.Containers[0].Image)
-		}
-	}
+	//store the existing ShipmentEnvironment in meta state
+	//so that create can re-attach user images
+	harborMeta.existingShipmentEnvironment = shipmentEnv
 
 	return nil
 }
@@ -337,7 +328,8 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 
 //make updates to remote resource (use shipit bulk and trigger)
 func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-	auth := meta.(*harborMeta).auth
+	harborMeta := meta.(*harborMeta)
+	auth := harborMeta.auth
 	shipmentName, env := idParts(d.Id())
 
 	//lookup the shipment in order to get the group/envvars (required for bulk creating env)
@@ -346,10 +338,8 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		return errors.New("shipment not found")
 	}
 
-	//TODO: always use the currently deployed images in an update
-
 	//transform tf resource data into shipit model
-	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, "", shipment.Group, shipment.EnvVars)
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, harborMeta.existingShipmentEnvironment, shipment.Group, shipment.EnvVars)
 	if err != nil {
 		return err
 	}
@@ -364,8 +354,8 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		log.Println(string(b))
 	}
 
-	//post shipment/environment
-	SaveNewShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	//save shipment/environment
+	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
 
 	//trigger shipment
 	success, messages := Trigger(shipmentName, env)
@@ -391,6 +381,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
 
+	//populate containers in
 	//[]map[string]interface{}
 	containers := make([]map[string]interface{}, len(shipmentEnv.Containers))
 	for i, container := range shipmentEnv.Containers {
@@ -399,7 +390,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 		containers[i] = c
 
 		//ports
-		var primaryPort *PortPayload
+		var primaryPort PortPayload
 		ports := make([]map[string]interface{}, len(shipmentEnv.Containers[i].Ports))
 		for j, port := range shipmentEnv.Containers[i].Ports {
 			p := make(map[string]interface{})
@@ -412,20 +403,15 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			p["enable_proxy_protocol"] = port.EnableProxyProtocol
 			p["ssl_arn"] = port.SslArn
 			p["ssl_management_type"] = port.SslManagementType
-			//TODO:
-			//p["private_key"] = port.
-			//p["public_key_certificate"] = port.
-			//p["certificate_chain"] = port.
 			ports[j] = p
-
 			if port.Primary {
-				primaryPort = &port
+				primaryPort = port
 			}
 		}
 		c["port"] = ports
 
-		//copy healthcheck settings from primary port to container
-		if primaryPort != nil {
+		//copy healthcheck settings from primary port up to container
+		if primaryPort != (PortPayload{}) {
 			if primaryPort.Healthcheck != "" {
 				c["healthcheck"] = primaryPort.Healthcheck
 			}
@@ -446,7 +432,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 }
 
 //populate a shipit ShipmentEnvironment from a terraform ResourceData
-func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingImage string, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
+func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShipmentEnvironment *ShipmentEnvironment, group string, shipmentEnvVars []EnvVarPayload) (*ShipmentEnvironment, error) {
 
 	result := ShipmentEnvironment{
 		ParentShipment: ParentShipment{
@@ -476,12 +462,45 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 
 			//container properties
 			result.Containers[i].Name = ctr["name"].(string)
-			result.Containers[i].Image = existingImage
 
 			//copy container healthcheck settings down to all ports
 			healthcheck := ctr["healthcheck"].(string)
 			hcTimeout := ctr["healthcheck_timeout"].(int)
 			hcInterval := ctr["healthcheck_interval"].(int)
+
+			//use existing container image, if specified, otherwise use default backend
+			useDefaultBackend := true
+			if existingShipmentEnvironment != nil {
+
+				//does this container already exist? (user could be adding a new container)
+				existingContainer := findContainer(result.Containers[i].Name, existingShipmentEnvironment.Containers)
+				if existingContainer != nil {
+					if Verbose {
+						log.Printf("using existing image for container: %v\n", result.Containers[i].Name)
+					}
+					result.Containers[i].Image = existingContainer.Image
+					useDefaultBackend = false
+				}
+			}
+
+			if useDefaultBackend {
+				if Verbose {
+					log.Printf("using default backend for container: %v\n", result.Containers[i].Name)
+				}
+
+				result.Containers[i].Image = fmt.Sprintf("%v:%v", defaultBackendImageName, defaultBackendImageVersion)
+
+				//add container env vars
+				result.Containers[i].EnvVars = make([]EnvVarPayload, 2)
+
+				//configure default backend to use user's port
+				result.Containers[i].EnvVars[0].Name = "PORT"
+				//value is set from primary port
+
+				//configure default backend to use user's health check route
+				result.Containers[i].EnvVars[1].Name = "HEALTHCHECK"
+				result.Containers[i].EnvVars[1].Value = healthcheck
+			}
 
 			//map ports
 			if portsResource, ok := ctr["port"].([]interface{}); ok && len(portsResource) > 0 {
@@ -498,7 +517,6 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 						}
 						p.Protocol = portMap["protocol"].(string)
 						p.Value = portMap["value"].(int)
-						p.Healthcheck = healthcheck
 						p.PublicPort = portMap["public_port"].(int)
 						p.External = portMap["external"].(bool)
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
@@ -508,29 +526,21 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingIma
 						p.SslArn = portMap["ssl_arn"].(string)
 						p.SslManagementType = portMap["ssl_management_type"].(string)
 
-						//use default backend if existing image is not supplied
-						if existingImage == "" {
-							if Verbose {
-								log.Println("using default backend")
-							}
-
-							result.Containers[i].Image = fmt.Sprintf("%v:%v", defaultBackendImageName, defaultBackendImageVersion)
-
-							result.Containers[i].EnvVars = make([]EnvVarPayload, 2)
-
-							//configure default backend to use user's port
-							result.Containers[i].EnvVars[0].Name = "PORT"
-							result.Containers[i].EnvVars[0].Value = strconv.Itoa(p.Value)
-
-							//configure default backend to use user's health check route
-							result.Containers[i].EnvVars[1].Name = "HEALTHCHECK"
-							result.Containers[i].EnvVars[1].Value = healthcheck
-						}
-
-						//map hc settings down to all ports
+						//use container-level settings
 						p.HealthcheckTimeout = &hcTimeout
 						p.HealthcheckInterval = &hcInterval
 
+						//primary port
+						if p.Primary {
+
+							//only primary port can have a health check
+							p.Healthcheck = healthcheck
+
+							//use primary port's value on for container-level PORT env var
+							if result.Containers[i].EnvVars != nil && len(result.Containers[i].EnvVars) > 0 {
+								result.Containers[i].EnvVars[0].Value = strconv.Itoa(p.Value)
+							}
+						}
 					} else {
 						return nil, errors.New("port is not a map[string]interface{}")
 					}

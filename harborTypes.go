@@ -56,10 +56,10 @@ type ShipmentEnvironment struct {
 	Username         string             `json:"username"`
 	Token            string             `json:"token"`
 	Name             string             `json:"name"`
-	EnvVars          []EnvVarPayload    `json:"envVars"`
-	Ports            []PortPayload      `json:"ports"`
-	Containers       []ContainerPayload `json:"containers"`
-	Providers        []ProviderPayload  `json:"providers"`
+	EnvVars          []EnvVarPayload    `json:"envVars,omitempty"`
+	Ports            []PortPayload      `json:"ports,omitempty"`
+	Containers       []ContainerPayload `json:"containers,omitempty"`
+	Providers        []ProviderPayload  `json:"providers,omitempty"`
 	ParentShipment   ParentShipment     `json:"parentShipment"`
 	BuildToken       string             `json:"buildToken,omitempty"`
 	EnableMonitoring bool               `json:"enableMonitoring"`
@@ -81,11 +81,11 @@ type EnvVarPayload struct {
 
 // PortPayload represents a port
 type PortPayload struct {
-	Name                string `json:"name,omitempty"`
+	Name                string `json:"name"`
 	Value               int    `json:"value,omitempty"`
 	Protocol            string `json:"protocol,omitempty"`
 	Healthcheck         string `json:"healthcheck,omitempty"`
-	Primary             bool   `json:"primary,omitempty"`
+	Primary             bool   `json:"primary"`
 	External            bool   `json:"external,omitempty"`
 	PublicVip           bool   `json:"public_vip,omitempty"`
 	PublicPort          int    `json:"public_port,omitempty"`

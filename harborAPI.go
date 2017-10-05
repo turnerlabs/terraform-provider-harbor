@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/jtacoma/uritemplates"
@@ -118,6 +119,9 @@ func GetShipmentEnvironment(username string, token string, shipment string, env 
 	if unmarshalErr != nil {
 		log.Fatal(unmarshalErr)
 	}
+
+	//sort data so we can ensure consistent order when writing/reading
+	sortData(&result)
 
 	return &result
 }
@@ -345,34 +349,30 @@ func Trigger(shipment string, env string) (bool, []string) {
 		log.Println(string(body))
 	}
 
+	//trigger api returns both single and multiple messages:
 	var result []string
 
-	//parse http OK responses as JSON
-	if resp.StatusCode == http.StatusOK {
-		//trigger api returns both single and multiple messages:
+	//example responses...
+	//error: {"message":"Could not parse docker image data from http://registry.services.dmtio.net/v2/mss-poc-thingproxy/manifests/: 757: unexpected token at '404 page not found\n'\n"}
+	//success: {"message":["compose-test.dev.services.ec2.dmtio.net:5000"]}
 
-		//example responses...
-		//error: {"message":"Could not parse docker image data from http://registry.services.dmtio.net/v2/mss-poc-thingproxy/manifests/: 757: unexpected token at '404 page not found\n'\n"}
-		//success: {"message":["compose-test.dev.services.ec2.dmtio.net:5000"]}
-
-		//single message
-		if strings.Contains(string(body), "message\":\"") {
-			//convert single message into an array for consistency
-			var response TriggerResponseSingle
-			unmarshalErr := json.Unmarshal(body, &response)
-			if unmarshalErr != nil {
-				log.Fatal(unmarshalErr)
-			}
-			result = append(result, response.Message)
-		} else if strings.Contains(string(body), "message\":[") {
-			//multiple messages
-			var response TriggerResponseMultiple
-			unmarshalErr := json.Unmarshal(body, &response)
-			if unmarshalErr != nil {
-				log.Fatal(unmarshalErr)
-			}
-			result = response.Messages
+	//single message
+	if strings.Contains(string(body), "message\":\"") {
+		//convert single message into an array for consistency
+		var response TriggerResponseSingle
+		unmarshalErr := json.Unmarshal(body, &response)
+		if unmarshalErr != nil {
+			log.Fatal(unmarshalErr)
 		}
+		result = append(result, response.Message)
+	} else if strings.Contains(string(body), "message\":[") {
+		//multiple messages
+		var response TriggerResponseMultiple
+		unmarshalErr := json.Unmarshal(body, &response)
+		if unmarshalErr != nil {
+			log.Fatal(unmarshalErr)
+		}
+		result = response.Messages
 	}
 
 	//return whether trigger call was successful along with messages
@@ -541,42 +541,47 @@ func UpdateContainerImage(username string, token string, shipment string, env st
 	}
 }
 
-// SaveNewShipmentEnvironment bulk saves a new shipment/environment
-func SaveNewShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) bool {
+func sortData(shipmentEnv *ShipmentEnvironment) {
+
+	//containers
+	sort.Slice(shipmentEnv.Containers, func(i, j int) bool {
+		return shipmentEnv.Containers[i].Name < shipmentEnv.Containers[j].Name
+	})
+
+	for _, container := range shipmentEnv.Containers {
+
+		//ports
+		sort.Slice(container.Ports, func(i, j int) bool {
+			return container.Ports[i].Name < container.Ports[j].Name
+		})
+
+		//envvars
+		sort.Slice(container.EnvVars, func(i, j int) bool {
+			return container.EnvVars[i].Name < container.EnvVars[j].Name
+		})
+	}
+
+	//envvars
+	sort.Slice(shipmentEnv.EnvVars, func(i, j int) bool {
+		return shipmentEnv.EnvVars[i].Name < shipmentEnv.EnvVars[j].Name
+	})
+}
+
+// SaveShipmentEnvironment bulk saves a new shipment/environment
+func SaveShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) bool {
 
 	var config = GetConfig()
 	shipment.Username = username
 	shipment.Token = token
+
+	//sort data so we can ensure consistent order when writing/reading
+	sortData(&shipment)
 
 	//POST /api/v1/shipments
 	res, body, err := create(username, token, config.ShipitURI+"/v1/bulk/shipments", shipment)
 
 	if err != nil || res.StatusCode != http.StatusCreated {
 		fmt.Printf("creating shipment was not successful: %v\ncode: %v\n", body, res.StatusCode)
-		return false
-	}
-
-	//api returns an object with an errors property that is
-	//false when there are no errors and an object if there are
-	if !strings.Contains(body, "errors\": false") {
-		return false
-	}
-
-	return true
-}
-
-// SaveExistingShipmentEnvironment bulk saves a new shipment/environment
-func SaveExistingShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) bool {
-
-	var config = GetConfig()
-	shipment.Username = username
-	shipment.Token = token
-
-	//PUT /api/v1/shipments
-	res, body, err := update(username, token, config.ShipitURI+"/v1/bulk/shipments", shipment)
-
-	if err != nil || res.StatusCode != http.StatusCreated {
-		fmt.Printf("updating shipment was not successful: %v\ncode: %v\n", body, res.StatusCode)
 		return false
 	}
 
