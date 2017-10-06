@@ -213,7 +213,11 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		log.Println(string(b))
 	}
 
-	//log.Fatal("debug")
+	//validate before saving
+	err = validateShipmentEnvironment(shipmentEnv)
+	if err != nil {
+		return err
+	}
 
 	//save shipment/environment
 	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
@@ -256,6 +260,39 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
 	d.Set("lb_dns_name", lbStatus.LoadBalancers[0].DNSName)
 	d.Set("lb_hosted_zone_id", lbStatus.LoadBalancers[0].CanonicalHostedZoneID)
+
+	return nil
+}
+
+func validateShipmentEnvironment(shipmentEnv *ShipmentEnvironment) error {
+
+	// - only 1 port is primary
+	// - only 1 healthcheck per container
+	// - port.public_port must be unique per env
+
+	primaryPorts := 0
+	publicPorts := make(map[int]int)
+	for _, container := range shipmentEnv.Containers {
+		hcPorts := 0
+		for _, port := range container.Ports {
+			if port.Healthcheck != "" {
+				hcPorts++
+				if hcPorts > 1 {
+					return fmt.Errorf("Container '%v' must have only 1 healthcheck port. Please remove the healthcheck from the other ports.", container.Name)
+				}
+			}
+			if port.Primary {
+				primaryPorts++
+				if primaryPorts > 1 {
+					return errors.New("must have exactly 1 primary container. Add 'primary = false' to non-primary containers")
+				}
+			}
+			if publicPorts[port.PublicPort] > 0 {
+				return fmt.Errorf("public_port '%v' must be unique", port.PublicPort)
+			}
+			publicPorts[port.PublicPort] = port.PublicPort
+		}
+	}
 
 	return nil
 }
