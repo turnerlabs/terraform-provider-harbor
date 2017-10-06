@@ -25,11 +25,11 @@ resource "harbor_shipment" "app" {
 }
 
 resource "harbor_shipment_env" "dev" {
-  shipment             = "${harbor_shipment.app.id}"
-  environment          = "dev"
-  barge                = "${var.barge}"
-  replicas             = 4
-  monitored            = false
+  shipment    = "${harbor_shipment.app.id}"
+  environment = "dev"
+  barge       = "${var.barge}"
+  replicas    = 4
+  monitored   = false
 
   container {
     name                 = "${var.app}"

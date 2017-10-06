@@ -56,25 +56,11 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:        schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:     schema.TypeString,
+						"primary": {
+							Type:     schema.TypeBool,
 							Optional: true,
+							Default:  true,
 							ForceNew: true,
-						},
-						"healthcheck": &schema.Schema{
-							Type:     schema.TypeString,
-							Required: true,
-							ForceNew: true,
-						},
-						"healthcheck_timeout": &schema.Schema{
-							Type:     schema.TypeInt,
-							Optional: true,
-							Default:  1,
-						},
-						"healthcheck_interval": &schema.Schema{
-							Type:     schema.TypeInt,
-							Optional: true,
-							Default:  10,
 						},
 						"port": {
 							Optional: true,
@@ -82,11 +68,21 @@ func resourceHarborShipmentEnv() *schema.Resource {
 							Type:     schema.TypeList,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
-									"primary": &schema.Schema{
-										Type:     schema.TypeBool,
-										ForceNew: true,
+									"healthcheck": &schema.Schema{
+										Type:     schema.TypeString,
 										Optional: true,
-										Default:  false,
+										Default:  "",
+										ForceNew: true,
+									},
+									"healthcheck_timeout": &schema.Schema{
+										Type:     schema.TypeInt,
+										Optional: true,
+										Default:  1,
+									},
+									"healthcheck_interval": &schema.Schema{
+										Type:     schema.TypeInt,
+										Optional: true,
+										Default:  10,
 									},
 									"protocol": &schema.Schema{
 										Type:     schema.TypeString,
@@ -381,20 +377,19 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
 
-	//populate containers in
 	//[]map[string]interface{}
 	containers := make([]map[string]interface{}, len(shipmentEnv.Containers))
 	for i, container := range shipmentEnv.Containers {
 		c := make(map[string]interface{})
-		c["name"] = container.Name
+		//TODO:
+		//c["name"] = container.Name
+		log.Println(container.Name)
 		containers[i] = c
 
 		//ports
-		var primaryPort PortPayload
 		ports := make([]map[string]interface{}, len(shipmentEnv.Containers[i].Ports))
 		for j, port := range shipmentEnv.Containers[i].Ports {
 			p := make(map[string]interface{})
-			p["primary"] = port.Primary
 			p["value"] = port.Value
 			p["public_port"] = port.PublicPort
 			p["public"] = port.PublicVip
@@ -403,25 +398,19 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			p["enable_proxy_protocol"] = port.EnableProxyProtocol
 			p["ssl_arn"] = port.SslArn
 			p["ssl_management_type"] = port.SslManagementType
-			ports[j] = p
+			p["healthcheck"] = port.Healthcheck
+			p["healthcheck_timeout"] = *port.HealthcheckTimeout
+			p["healthcheck_interval"] = *port.HealthcheckInterval
+
+			//set container as primary since it contains the shipment/env's primary port
+			//and there can only be 1 per shipment/env
 			if port.Primary {
-				primaryPort = port
+				c["primary"] = true
 			}
+
+			ports[j] = p
 		}
 		c["port"] = ports
-
-		//copy healthcheck settings from primary port up to container
-		if primaryPort != (PortPayload{}) {
-			if primaryPort.Healthcheck != "" {
-				c["healthcheck"] = primaryPort.Healthcheck
-			}
-			if primaryPort.HealthcheckTimeout != nil {
-				c["healthcheck_timeout"] = *primaryPort.HealthcheckTimeout
-			}
-			if primaryPort.HealthcheckInterval != nil {
-				c["healthcheck_interval"] = *primaryPort.HealthcheckInterval
-			}
-		}
 	}
 	err := d.Set("container", containers)
 	if err != nil {
@@ -460,13 +449,11 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 		for i, c := range containers {
 			ctr := c.(map[string]interface{})
 
-			//container properties
-			result.Containers[i].Name = ctr["name"].(string)
-
-			//copy container healthcheck settings down to all ports
-			healthcheck := ctr["healthcheck"].(string)
-			hcTimeout := ctr["healthcheck_timeout"].(int)
-			hcInterval := ctr["healthcheck_interval"].(int)
+			//name container based on shipment plus "_n"
+			result.Containers[i].Name = result.ParentShipment.Name
+			if i > 0 {
+				result.Containers[i].Name = fmt.Sprintf("%v-%v", result.Containers[i].Name, i)
+			}
 
 			//use existing container image, if specified, otherwise use default backend
 			useDefaultBackend := true
@@ -495,11 +482,11 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 
 				//configure default backend to use user's port
 				result.Containers[i].EnvVars[0].Name = "PORT"
-				//value is set from primary port
+				//value is set later from hc port
 
 				//configure default backend to use user's health check route
 				result.Containers[i].EnvVars[1].Name = "HEALTHCHECK"
-				result.Containers[i].EnvVars[1].Value = healthcheck
+				//value is set later from hc port
 			}
 
 			//map ports
@@ -521,24 +508,29 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 						p.External = portMap["external"].(bool)
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
 						p.External = portMap["external"].(bool)
-						p.Primary = portMap["primary"].(bool)
 						p.PublicVip = portMap["public"].(bool)
 						p.SslArn = portMap["ssl_arn"].(string)
 						p.SslManagementType = portMap["ssl_management_type"].(string)
 
-						//use container-level settings
+						//healthcheck
+						p.Healthcheck = portMap["healthcheck"].(string)
+						hcTimeout := portMap["healthcheck_timeout"].(int)
 						p.HealthcheckTimeout = &hcTimeout
+						hcInterval := portMap["healthcheck_interval"].(int)
 						p.HealthcheckInterval = &hcInterval
 
-						//primary port
-						if p.Primary {
+						//is this the hc port?
+						if p.Healthcheck != "" {
 
-							//only primary port can have a health check
-							p.Healthcheck = healthcheck
-
-							//use primary port's value on for container-level PORT env var
-							if result.Containers[i].EnvVars != nil && len(result.Containers[i].EnvVars) > 0 {
+							//set container env vars to hc values for default backend
+							if useDefaultBackend {
 								result.Containers[i].EnvVars[0].Value = strconv.Itoa(p.Value)
+								result.Containers[i].EnvVars[1].Value = p.Healthcheck
+							}
+
+							//make this port primary if it's an hc port and the container is marked as primary
+							if isContainerPrimary := ctr["primary"].(bool); isContainerPrimary {
+								p.Primary = true
 							}
 						}
 					} else {
