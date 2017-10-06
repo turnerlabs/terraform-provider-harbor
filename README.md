@@ -52,14 +52,13 @@ resource "harbor_shipment_env" "dev" {
   monitored   = false
 
   container {
-    name        = "my-app"
-    healthcheck = "/health"
+    name = "my-app"
 
     port {
-      primary     = true
       protocol    = "http"
       public_port = 80
       value       = 5000
+      healthcheck = "/health"
     }
   }
 }

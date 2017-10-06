@@ -32,19 +32,15 @@ resource "harbor_shipment_env" "dev" {
   monitored   = false
 
   container {
-    name                 = "${var.app}"
-    healthcheck          = "/health"
-    healthcheck_timeout  = 1
-    healthcheck_interval = 10
+    name = "${var.app}"
 
     port {
-      primary             = "true"
-      protocol            = "https"
-      public_port         = 443
-      value               = 5000
-      healthcheck         = "/health"
-      ssl_management_type = "acm"
-      ssl_arn             = "${data.aws_acm_certificate.app.arn}"
+      protocol             = "https"
+      public_port          = 443
+      value                = 5000
+      healthcheck          = "/health"
+      ssl_management_type  = "acm"
+      ssl_arn              = "${data.aws_acm_certificate.app.arn}"
     }
   }
 }

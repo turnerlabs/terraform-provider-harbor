@@ -56,6 +56,10 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:        schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
 						"primary": {
 							Type:     schema.TypeBool,
 							Optional: true,
@@ -328,14 +332,14 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	auth := harborMeta.auth
 	shipmentName, env := idParts(d.Id())
 
-	//lookup the shipment in order to get the group/envvars (required for bulk creating env)
-	shipment := GetShipment(auth.Username, auth.Token, shipmentName)
-	if shipment == nil {
-		return errors.New("shipment not found")
+	//lookup existing shipment/env
+	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipmentName, env)
+	if shipmentEnv == nil {
+		return errors.New("shipment/environment doesn't exist")
 	}
 
 	//transform tf resource data into shipit model
-	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, harborMeta.existingShipmentEnvironment, shipment.Group, shipment.EnvVars)
+	shipmentEnv, err := transformTerraformToShipmentEnvironment(d, shipmentEnv, shipmentEnv.ParentShipment.Group, shipmentEnv.ParentShipment.EnvVars)
 	if err != nil {
 		return err
 	}
@@ -381,9 +385,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	containers := make([]map[string]interface{}, len(shipmentEnv.Containers))
 	for i, container := range shipmentEnv.Containers {
 		c := make(map[string]interface{})
-		//TODO:
-		//c["name"] = container.Name
-		log.Println(container.Name)
+		c["name"] = container.Name
 		containers[i] = c
 
 		//ports
@@ -448,12 +450,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 		result.Containers = make([]ContainerPayload, len(containers))
 		for i, c := range containers {
 			ctr := c.(map[string]interface{})
-
-			//name container based on shipment plus "_n"
-			result.Containers[i].Name = result.ParentShipment.Name
-			if i > 0 {
-				result.Containers[i].Name = fmt.Sprintf("%v-%v", result.Containers[i].Name, i)
-			}
+			result.Containers[i].Name = ctr["name"].(string)
 
 			//use existing container image, if specified, otherwise use default backend
 			useDefaultBackend := true
