@@ -85,14 +85,13 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	}
 
 	meta := harborMeta{
-		auth:  &auth,
-		state: make(map[string]interface{}),
+		auth: &auth,
 	}
 
 	return &meta, nil
 }
 
 type harborMeta struct {
-	auth  *Auth
-	state map[string]interface{}
+	auth                        *Auth
+	existingShipmentEnvironment *ShipmentEnvironment
 }
