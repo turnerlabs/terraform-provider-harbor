@@ -381,7 +381,6 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		return err
 	}
 
-	//add auth
 	shipmentEnv.Username = auth.Username
 	shipmentEnv.Token = auth.Token
 
@@ -389,6 +388,12 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	if Verbose {
 		b, _ := json.MarshalIndent(shipmentEnv, "\t", "\t")
 		log.Println(string(b))
+	}
+
+	//validate before saving
+	err = validateShipmentEnvironment(shipmentEnv)
+	if err != nil {
+		return err
 	}
 
 	//save shipment/environment
@@ -495,13 +500,16 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 
 				//does this container already exist? (user could be adding a new container)
 				existingContainer := findContainer(result.Containers[i].Name, existingShipmentEnvironment.Containers)
-				if existingContainer != nil {
+				if existingContainer.Name != "" {
 					if Verbose {
-						log.Printf("using existing image for container: %v\n", result.Containers[i].Name)
+						log.Printf("using existing image/envvars for container: %v\n", result.Containers[i].Name)
 					}
 					result.Containers[i].Image = existingContainer.Image
 					useDefaultBackend = false
 				}
+
+				//copy over any existing container env vars
+				result.Containers[i].EnvVars = existingContainer.EnvVars
 			}
 
 			if useDefaultBackend {
