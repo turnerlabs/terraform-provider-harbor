@@ -9,6 +9,28 @@ import (
 	"github.com/jtacoma/uritemplates"
 )
 
+const (
+	envVarNameShipLogs     = "SHIP_LOGS"
+	envVarNameLogsEndpoint = "LOGS_ENDPOINT"
+	envVarNameAccessKey    = "LOGS_ACCESS_KEY"
+	envVarNameSecretKey    = "LOGS_SECRET_KEY"
+	envVarNameDomainName   = "LOGS_DOMAIN_NAME"
+	envVarNameRegion       = "LOGS_REGION"
+	envVarNameQueueName    = "LOGS_QUEUE_NAME"
+)
+
+func logShippingEnvVars() map[string]string {
+	return map[string]string{
+		envVarNameShipLogs:     envVarNameShipLogs,
+		envVarNameLogsEndpoint: envVarNameLogsEndpoint,
+		envVarNameAccessKey:    envVarNameAccessKey,
+		envVarNameSecretKey:    envVarNameSecretKey,
+		envVarNameDomainName:   envVarNameDomainName,
+		envVarNameRegion:       envVarNameRegion,
+		envVarNameQueueName:    envVarNameQueueName,
+	}
+}
+
 func trace(msg string) {
 	if Verbose {
 		fmt.Println(msg)
@@ -84,4 +106,31 @@ func findContainer(container string, containers []ContainerPayload) ContainerPay
 		}
 	}
 	return ContainerPayload{}
+}
+
+func findEnvVar(name string, envVars []EnvVarPayload) EnvVarPayload {
+	for _, e := range envVars {
+		if e.Name == name {
+			return e
+		}
+	}
+	return EnvVarPayload{}
+}
+
+func appendEnvVar(envvars []EnvVarPayload, name string, value string) []EnvVarPayload {
+	return append(envvars, EnvVarPayload{
+		Name:  name,
+		Value: value,
+	})
+}
+
+//returns a new slice containing user defined (non log-shipping) env vars
+func copyUserDefinedEnvVars(envvars []EnvVarPayload) []EnvVarPayload {
+	result := []EnvVarPayload{}
+	for _, e := range envvars {
+		if logShippingEnvVars()[e.Name] == "" {
+			result = append(result, e)
+		}
+	}
+	return result
 }
