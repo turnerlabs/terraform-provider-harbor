@@ -12,8 +12,10 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
-const defaultBackendImageName = "quay.io/turner/turner-defaultbackend"
-const defaultBackendImageVersion = "0.2.0"
+const (
+	defaultBackendImageName    = "quay.io/turner/turner-defaultbackend"
+	defaultBackendImageVersion = "0.2.0"
+)
 
 func resourceHarborShipmentEnv() *schema.Resource {
 	return &schema.Resource{
@@ -47,12 +49,57 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
+			"log_shipping": &schema.Schema{
+				Description: "Configure harbor log shipping",
+				Optional:    true,
+				MinItems:    0,
+				MaxItems:    1,
+				Type:        schema.TypeList,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"provider": {
+							Description: "Which provider to use to send logs. Possible values are: logzio, elasticsearch, aws-elasticsearch, sqs, loggly",
+							Type:        schema.TypeString,
+							Required:    true,
+						},
+						"endpoint": {
+							Description: "provider's endpoint",
+							Type:        schema.TypeString,
+							Required:    true,
+						},
+						"aws_access_key": {
+							Description: "aws access key (required by aws-elasticsearch and sqs providers)",
+							Type:        schema.TypeString,
+							Optional:    true,
+						},
+						"aws_secret_key": {
+							Description: "aws secret key (required by aws-elasticsearch and sqs providers)",
+							Type:        schema.TypeString,
+							Optional:    true,
+						},
+						"aws_region": {
+							Description: "aws region (required by aws-elasticsearch provider)",
+							Type:        schema.TypeString,
+							Optional:    true,
+						},
+						"aws_elasticsearch_domain_name": {
+							Description: "elastic search domain name (required by aws-elasticsearch provider)",
+							Type:        schema.TypeString,
+							Optional:    true,
+						},
+						"sqs_queue_name": {
+							Description: "sqs queue name (required by sqs provider)",
+							Type:        schema.TypeString,
+							Optional:    true,
+						},
+					},
+				},
+			},
 			"container": &schema.Schema{
 				Description: "The list of containers for this shipment environment",
 				Optional:    true,
 				ForceNew:    true,
 				MinItems:    1,
-				Computed:    true,
 				Type:        schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -423,6 +470,52 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
 
+	//log shipping
+	envvar := findEnvVar(envVarNameShipLogs, shipmentEnv.EnvVars)
+	if envvar != (EnvVarPayload{}) {
+		log.Println("translating log shipping env vars")
+
+		logShipping := make([]map[string]interface{}, 1)
+		logShippingConfig := make(map[string]interface{})
+		logShippingConfig["provider"] = envvar.Value
+
+		if envvar = findEnvVar(envVarNameLogsEndpoint, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["endpoint"] = envvar.Value
+		}
+
+		if envvar = findEnvVar(envVarNameDomainName, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["aws_elasticsearch_domain_name"] = envvar.Value
+		}
+
+		if envvar := findEnvVar(envVarNameRegion, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["aws_region"] = envvar.Value
+		}
+
+		if envvar = findEnvVar(envVarNameAccessKey, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["aws_access_key"] = envvar.Value
+		}
+
+		if envvar = findEnvVar(envVarNameSecretKey, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["aws_secret_key"] = envvar.Value
+		}
+
+		if envvar = findEnvVar(envVarNameQueueName, shipmentEnv.EnvVars); envvar != (EnvVarPayload{}) {
+			logShippingConfig["sqs_queue_name"] = envvar.Value
+		}
+
+		logShipping[0] = logShippingConfig
+		err := d.Set("log_shipping", logShipping)
+		if err != nil {
+			return err
+		}
+	} else { //SHIP_LOGS not found
+		//remove tf config
+		err := d.Set("log_shipping", nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	//[]map[string]interface{}
 	containers := make([]map[string]interface{}, len(shipmentEnv.Containers))
 	for i, container := range shipmentEnv.Containers {
@@ -485,6 +578,37 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 		EnvVars:  make([]EnvVarPayload, 0),
 	}
 	result.Providers = append(result.Providers, provider)
+
+	//copy over any existing user-defined environment-level env vars
+	if existingShipmentEnvironment != nil {
+		result.EnvVars = copyUserDefinedEnvVars(existingShipmentEnvironment.EnvVars)
+	}
+
+	//translate log_shipping configuration into harbor env vars
+	logShippingResource := d.Get("log_shipping") //[]map[string]interface{}
+	if logShipping, ok := logShippingResource.([]interface{}); ok && len(logShipping) > 0 {
+		log.Println("processing log_shipping")
+		ls := logShipping[0].(map[string]interface{})
+
+		//all providers require SHIP_LOGS and LOGS_ENDPOINT
+		result.EnvVars = appendEnvVar(result.EnvVars, envVarNameShipLogs, ls["provider"].(string))
+		result.EnvVars = appendEnvVar(result.EnvVars, envVarNameLogsEndpoint, ls["endpoint"].(string))
+
+		//provider specific
+		switch ls["provider"] {
+
+		case "aws-elasticsearch":
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameDomainName, ls["aws_elasticsearch_domain_name"].(string))
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameRegion, ls["aws_region"].(string))
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameAccessKey, ls["aws_access_key"].(string))
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameSecretKey, ls["aws_secret_key"].(string))
+
+		case "sqs":
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameQueueName, ls["sqs_queue_name"].(string))
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameAccessKey, ls["aws_access_key"].(string))
+			result.EnvVars = appendEnvVar(result.EnvVars, envVarNameSecretKey, ls["aws_secret_key"].(string))
+		}
+	}
 
 	//map containers
 	containersResource := d.Get("container") //[]map[string]interface{}
