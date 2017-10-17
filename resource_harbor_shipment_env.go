@@ -24,6 +24,9 @@ func resourceHarborShipmentEnv() *schema.Resource {
 		Update: resourceHarborShipmentEnvironmentUpdate,
 		Delete: resourceHarborShipmentEnvironmentDelete,
 		Exists: resourceHarborShipmentEnvironmentExists,
+		Importer: &schema.ResourceImporter{
+			State: resourceHarborShipmentEnvironmentImport,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"shipment": &schema.Schema{
@@ -410,6 +413,25 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 	return nil
 }
 
+func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+
+	//lookup and set the arguments
+	auth := meta.(*harborMeta).auth
+	shipment, env := idParts(d.Id())
+	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
+	if shipmentEnv == nil {
+		return nil, errors.New("shipment/environment doesn't exist")
+	}
+
+	//transform shipit model back to terraform
+	err := transformShipmentEnvironmentToTerraform(shipmentEnv, d)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*schema.ResourceData{d}, nil
+}
+
 //make updates to remote resource (use shipit bulk and trigger)
 func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
 	harborMeta := meta.(*harborMeta)
@@ -463,6 +485,7 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d *schema.ResourceData) error {
 
 	//set attributes
+	d.Set("shipment", shipmentEnv.ParentShipment.Name)
 	d.Set("environment", shipmentEnv.Name)
 	d.Set("monitored", shipmentEnv.EnableMonitoring)
 
