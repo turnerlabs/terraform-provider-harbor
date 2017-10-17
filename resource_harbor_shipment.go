@@ -14,6 +14,9 @@ func resourceHarborShipment() *schema.Resource {
 		Update: resourceHarborShipmentUpdate,
 		Delete: resourceHarborShipmentDelete,
 		Exists: resourceHarborShipmentExists,
+		Importer: &schema.ResourceImporter{
+			State: resourceHarborShipmentImport,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"shipment": &schema.Schema{
@@ -27,6 +30,20 @@ func resourceHarborShipment() *schema.Resource {
 			},
 		},
 	}
+}
+
+func resourceHarborShipmentImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+
+	//lookup and set the arguments
+	auth := meta.(*harborMeta).auth
+	shipment := GetShipment(auth.Username, auth.Token, d.Id())
+	if shipment == nil {
+		return nil, errors.New("shipment doesn't exist")
+	}
+	d.Set("shipment", shipment.Name)
+	d.Set("group", shipment.Group)
+
+	return []*schema.ResourceData{d}, nil
 }
 
 func resourceHarborShipmentCreate(d *schema.ResourceData, meta interface{}) error {
