@@ -14,6 +14,9 @@ func resourceHarborShipment() *schema.Resource {
 		Update: resourceHarborShipmentUpdate,
 		Delete: resourceHarborShipmentDelete,
 		Exists: resourceHarborShipmentExists,
+		Importer: &schema.ResourceImporter{
+			State: resourceHarborShipmentImport,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"shipment": &schema.Schema{
@@ -120,6 +123,17 @@ func resourceHarborShipmentUpdate(d *schema.ResourceData, meta interface{}) erro
 	return nil
 }
 
+//has the resource been deleted outside of terraform?
+func resourceHarborShipmentExists(d *schema.ResourceData, meta interface{}) (bool, error) {
+	auth := meta.(*harborMeta).auth
+	shipment := GetShipment(auth.Username, auth.Token, d.Id())
+	if shipment == nil {
+		d.SetId("")
+		return false, nil
+	}
+	return true, nil
+}
+
 //can assume resoure exists (since tf calls exists)
 //remote data should be updated into the local data
 func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error {
@@ -134,13 +148,16 @@ func resourceHarborShipmentRead(d *schema.ResourceData, meta interface{}) error 
 	return nil
 }
 
-//has the resource been deleted outside of terraform?
-func resourceHarborShipmentExists(d *schema.ResourceData, meta interface{}) (bool, error) {
+func resourceHarborShipmentImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+
+	//lookup and set the arguments
 	auth := meta.(*harborMeta).auth
 	shipment := GetShipment(auth.Username, auth.Token, d.Id())
 	if shipment == nil {
-		d.SetId("")
-		return false, nil
+		return nil, errors.New("shipment doesn't exist")
 	}
-	return true, nil
+	d.Set("shipment", shipment.Name)
+	d.Set("group", shipment.Group)
+
+	return []*schema.ResourceData{d}, nil
 }
