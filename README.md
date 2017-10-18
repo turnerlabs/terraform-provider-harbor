@@ -17,16 +17,21 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 - works with changes made in GUI or CLI
 - leverages terraform's first class support state synchronization
 
-[![asciicast](https://asciinema.org/a/d0WZRJuwOsLwVUkL9AgePWxNH.png)](https://asciinema.org/a/d0WZRJuwOsLwVUkL9AgePWxNH?autoplay=1&speed=2)
+[![asciicast](https://asciinema.org/a/IxeoNYl7RmmSTwYMURtODytHO.png)](https://asciinema.org/a/IxeoNYl7RmmSTwYMURtODytHO?autoplay=1)
 
 ### Installation
 
-- install plugin binary
+- install plugin binary locally
 ```
 curl -sSL https://raw.githubusercontent.com/turnerlabs/terraform-provider-harbor/master/install.sh | sh
 ```
 
-- install [harbor-compose](https://github.com/turnerlabs/harbor-compose) binary (required for authentication and for deploying your application images and environment variables on to the infrastructure)
+- OR install plugin binary globally
+```
+curl -sSL https://raw.githubusercontent.com/turnerlabs/terraform-provider-harbor/master/install-global.sh | sh
+```
+
+- install [harbor-compose](https://github.com/turnerlabs/harbor-compose) which is required for authentication and for deploying your application images and environment variables on to the infrastructure
 ```
 sudo curl -sSLo /usr/local/bin/harbor-compose https://github.com/turnerlabs/harbor-compose/releases/download/v0.14.0/ncd_darwin_amd64 &&  sudo chmod +x /usr/local/bin/harbor-compose
 ```
