@@ -21,20 +21,17 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 
 ### Installation
 
-- install plugin binary locally
+- install plugin
 ```
-curl -sSL https://raw.githubusercontent.com/turnerlabs/terraform-provider-harbor/master/install.sh | sh
-```
-
-- OR install plugin binary globally
-```
-curl -sSL https://raw.githubusercontent.com/turnerlabs/terraform-provider-harbor/master/install-global.sh | sh
+curl -s get-tf.harbor.turnerlabs.io | sh
 ```
 
 - install [harbor-compose](https://github.com/turnerlabs/harbor-compose) which is required for authentication and for deploying your application images and environment variables on to the infrastructure
 ```
-sudo curl -sSLo /usr/local/bin/harbor-compose https://github.com/turnerlabs/harbor-compose/releases/download/v0.14.0/ncd_darwin_amd64 &&  sudo chmod +x /usr/local/bin/harbor-compose
+curl -s get-cli.harbor.turnerlabs.io | sh
 ```
+
+[Provider Documentation](wiki)
 
 
 ### Usage example
