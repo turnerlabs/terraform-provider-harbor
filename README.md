@@ -31,6 +31,8 @@ curl -s get-tf.harbor.turnerlabs.io | sh
 curl -s get-cli.harbor.turnerlabs.io | sh
 ```
 
+[Provider Documentation](wiki)
+
 
 ### Usage example
 
