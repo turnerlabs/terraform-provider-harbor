@@ -53,6 +53,11 @@ resource "harbor_shipment_env" "dev" {
   replicas    = 4
   monitored   = false
 
+  annotations {
+    foo = "foo value"
+    bar = "bar value"
+  }
+
   container {
     name = "my-app"
 
