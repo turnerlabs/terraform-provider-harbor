@@ -37,9 +37,14 @@ resource "harbor_shipment_env" "prod" {
   healthcheck_timeout  = 1
   healthcheck_interval = 10
 
+  annotations {
+    foo = "foo value"
+    bar = "bar value"
+  }
+
   container {
     name = "my-app"
-    
+
     port {
       name         = "PORT"
       protocol     = "https"
@@ -56,7 +61,7 @@ resource "harbor_shipment_env" "prod" {
       health_check = "/health"
     }    
   }  
-  
+
   logShipping {
     type     = "logzio"
     endpoint = "http://xyz"
