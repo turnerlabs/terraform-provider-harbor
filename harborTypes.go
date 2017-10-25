@@ -114,8 +114,8 @@ type ProviderPayload struct {
 }
 
 type AnnotationsPayload struct {
-	Key   string `json:key,omitempty`
-	Value string `json:value,omitempty`
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // TriggerResponseSingle is the payload returned from the trigger api
