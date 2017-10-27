@@ -53,16 +53,17 @@ type DockerComposeService struct {
 
 // ShipmentEnvironment represents a shipment/environment combination
 type ShipmentEnvironment struct {
-	Username         string             `json:"username"`
-	Token            string             `json:"token"`
-	Name             string             `json:"name"`
-	EnvVars          []EnvVarPayload    `json:"envVars,omitempty"`
-	Ports            []PortPayload      `json:"ports,omitempty"`
-	Containers       []ContainerPayload `json:"containers,omitempty"`
-	Providers        []ProviderPayload  `json:"providers,omitempty"`
-	ParentShipment   ParentShipment     `json:"parentShipment"`
-	BuildToken       string             `json:"buildToken,omitempty"`
-	EnableMonitoring bool               `json:"enableMonitoring"`
+	Username         string               `json:"username"`
+	Token            string               `json:"token"`
+	Name             string               `json:"name"`
+	EnvVars          []EnvVarPayload      `json:"envVars,omitempty"`
+	Ports            []PortPayload        `json:"ports,omitempty"`
+	Containers       []ContainerPayload   `json:"containers,omitempty"`
+	Providers        []ProviderPayload    `json:"providers,omitempty"`
+	Annotations      []AnnotationsPayload `json:"annotations"`
+	ParentShipment   ParentShipment       `json:"parentShipment"`
+	BuildToken       string               `json:"buildToken,omitempty"`
+	EnableMonitoring bool                 `json:"enableMonitoring"`
 }
 
 // The ParentShipment of the shipmentModel
@@ -110,6 +111,11 @@ type ProviderPayload struct {
 	Replicas int             `json:"replicas"`
 	EnvVars  []EnvVarPayload `json:"envVars,omitempty"`
 	Barge    string          `json:"barge,omitempty"`
+}
+
+type AnnotationsPayload struct {
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // TriggerResponseSingle is the payload returned from the trigger api

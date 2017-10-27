@@ -98,6 +98,10 @@ func resourceHarborShipmentEnv() *schema.Resource {
 					},
 				},
 			},
+			"annotations": &schema.Schema{
+				Type:     schema.TypeMap,
+				Optional: true,
+			},
 			"container": &schema.Schema{
 				Description: "The list of containers for this shipment environment",
 				Optional:    true,
@@ -493,6 +497,16 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("barge", provider.Barge)
 	d.Set("replicas", provider.Replicas)
 
+	// annotations
+	annotations := make(map[string]string, len(shipmentEnv.Annotations))
+	for _, anno := range shipmentEnv.Annotations {
+		annotations[anno.Key] = anno.Value
+	}
+	annoErr := d.Set("annotations", annotations)
+	if annoErr != nil {
+		return annoErr
+	}
+
 	//log shipping
 	envvar := findEnvVar(envVarNameShipLogs, shipmentEnv.EnvVars)
 	if envvar != (EnvVarPayload{}) {
@@ -605,6 +619,21 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 	//copy over any existing user-defined environment-level env vars
 	if existingShipmentEnvironment != nil {
 		result.EnvVars = copyUserDefinedEnvVars(existingShipmentEnvironment.EnvVars)
+	}
+
+	// annotations
+	annotationsResource := d.Get("annotations")
+	if annotations, ok := annotationsResource.(map[string]interface{}); ok && len(annotations) > 0 {
+		result.Annotations = make([]AnnotationsPayload, len(annotations))
+
+		for k, v := range annotations {
+			anno := AnnotationsPayload{
+				Key:   k,
+				Value: v.(string),
+			}
+
+			result.Annotations = append(result.Annotations, anno)
+		}
 	}
 
 	//translate log_shipping configuration into harbor env vars
