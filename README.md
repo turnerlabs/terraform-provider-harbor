@@ -21,7 +21,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://
 
 ### Installation
 
-- install plugin
+- install plugin (depends on terraform v0.10.0 or later)
 ```
 curl -s get-tf.harbor.turnerlabs.io | sh
 ```
