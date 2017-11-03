@@ -270,7 +270,6 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	//validate before saving
 	err = validateShipmentEnvironment(shipmentEnv)
 	if err != nil {
-		writeMetricError(metricEnvCreate, err)
 		return err
 	}
 
@@ -479,7 +478,6 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	//validate before saving
 	err = validateShipmentEnvironment(shipmentEnv)
 	if err != nil {
-		writeMetricError(metricEnvUpdate, err)
 		return err
 	}
 
