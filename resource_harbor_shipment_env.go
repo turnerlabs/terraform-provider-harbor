@@ -647,7 +647,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 				Value: v.(string),
 			}
 
-			result.Annotations = append(result.Annotations, anno)
+			result.Annotations[k] = anno
 		}
 	}
 
