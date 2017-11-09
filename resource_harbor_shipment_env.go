@@ -641,13 +641,15 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 	if annotations, ok := annotationsResource.(map[string]interface{}); ok && len(annotations) > 0 {
 		result.Annotations = make([]AnnotationsPayload, len(annotations))
 
+		i := 0
 		for k, v := range annotations {
 			anno := AnnotationsPayload{
 				Key:   k,
 				Value: v.(string),
 			}
 
-			result.Annotations[k] = anno
+			result.Annotations[i] = anno
+			i++
 		}
 	}
 
