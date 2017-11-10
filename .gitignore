@@ -3,6 +3,7 @@ terraform-provider-harbor
 *.tfstate.backup
 .terraform
 main.tf
+!examples/dns-ssl/main.tf
 test
 trigger.md
 docker-compose.yml
@@ -13,3 +14,8 @@ test-server/test-server
 .vscode
 flow.md
 z.log
+build.sh
+mapping-complex.png
+mapping-simple.png
+mapping-complex2.png
+.editorconfig

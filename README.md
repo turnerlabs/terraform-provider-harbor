@@ -3,20 +3,38 @@ terraform-provider-harbor
 
 A [Terraform](https://www.terraform.io/) provider for managing [Harbor](https://github.com/turnerlabs/harbor) resources.
 
-Benefits:
+### Benefits
 
 - infrastructure as code (versionable and reproducible infrastructure)
 - all of your infrastructure declared in a single place, format, command
 - native integration with the vast landscape of existing terraform providers
-- user doesn't have to understand idiosyncrasies of shipit and trigger what types of changes require setting replicas = 0 and triggering
-- outputs managed load balancer information for integration with route 53
-- aws role integration
-- tag integration
+- user doesn't have to understand idiosyncrasies of ShipIt and Trigger, and what types of changes require setting replicas = 0 and triggering
+- HTTPS/TLS setup via IaC
+- AWS Tag integration
+- AWS Route53 integration (outputs managed load balancer information)
+- AWS ACM integration
+- AWS Role integration (coming)
 - works with changes made in GUI or CLI
 - leverages terraform's first class support state synchronization
 
+[![asciicast](https://asciinema.org/a/IxeoNYl7RmmSTwYMURtODytHO.png)](https://asciinema.org/a/IxeoNYl7RmmSTwYMURtODytHO?autoplay=1)
 
-#### usage example
+### Installation
+
+- install plugin (depends on terraform v0.10.0 or later)
+```
+curl -s get-tf.harbor.turnerlabs.io | sh
+```
+
+- install [harbor-compose](https://github.com/turnerlabs/harbor-compose) which is required for authentication and for deploying your application images and environment variables on to the infrastructure
+```
+curl -s get-cli.harbor.turnerlabs.io | sh
+```
+
+[Provider Documentation](wiki)
+
+
+### Usage example
 
 ```terraform
 provider "harbor" {
@@ -25,60 +43,38 @@ provider "harbor" {
 
 resource "harbor_shipment" "app" {
   shipment = "my-app"
-  group    = "my-team"
+  group    = "mss"
 }
 
-resource "harbor_shipment_env" "prod" {
-  shipment             = "${harbor_shipment.app.id}"
-  environment          = "prod"
-  barge                = "ent-prod"
-  replicas             = 3
-  monitored            = false
-  healthcheck_timeout  = 1
-  healthcheck_interval = 10
+resource "harbor_shipment_env" "dev" {
+  shipment    = "${harbor_shipment.app.id}"
+  environment = "dev"
+  barge       = "digital-sandbox"
+  replicas    = 4
+  monitored   = false
+
+  annotations {
+    foo = "foo value"
+    bar = "bar value"
+  }
 
   container {
     name = "my-app"
-    
+
     port {
-      name         = "PORT"
-      protocol     = "https"
-      public_port  = 443
-      value        = 3000
-      aws_arn      = "${aws_acm_certificate.my-app.arn}"
+      protocol    = "http"
+      public_port = 80
+      value       = 5000
+      healthcheck = "/health"
     }
-
-    port {
-      name         = "PORT"
-      protocol     = "http"
-      public_port  = 80
-      value        = 5000
-      health_check = "/health"
-    }    
-  }  
-  
-  logShipping {
-    type     = "logzio"
-    endpoint = "http://xyz"
   }
 }
 
-data "aws_elb_hosted_zone_id" "region" {}
-
-resource "aws_route53_record" "app" {
-  zone_id = "${aws_route53_zone.my_app.zone_id}"
-  name    = "my-app.turnerapps.com"
-  type    = "A"
-
-  alias {
-    name                   = "${harbor_shipment_env.prod.lb_dns_name}"
-    zone_id                = "${data.aws_elb_hosted_zone_id.region.id}"
-    evaluate_target_health = false
-  }
-}
-
-data "aws_acm_certificate" "app" {
-  domain   = "my-app.turnerapps.com"
-  statuses = ["ISSUED"]
+output "dns_name" {
+  value = "${harbor_shipment_env.dev.dns_name}"
 }
 ```
+
+### Other examples
+
+- [DNS and SSL](examples/dns-ssl)

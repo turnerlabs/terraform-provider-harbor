@@ -51,6 +51,7 @@ func generateRandomID() string {
 }
 
 func dataSourceHarborElbRead(d *schema.ResourceData, meta interface{}) error {
+	writeMetric(metricHarborElbRead)
 	d.SetId(generateRandomID())
 
 	shipment := d.Get("shipment").(string)
@@ -65,16 +66,20 @@ func dataSourceHarborElbRead(d *schema.ResourceData, meta interface{}) error {
 		EndBytes()
 
 	if err != nil {
+		writeMetricError(metricHarborElbRead, err[0])
 		return err[0]
 	}
 	if res.StatusCode != 200 {
-		return errors.New("get load balancer status api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
+		newErr := errors.New("get load balancer status api returned " + strconv.Itoa(res.StatusCode) + " for " + uri)
+		writeMetricError(metricHarborElbRead, newErr)
+		return newErr
 	}
 
 	var lb loadBalancerStatus
-	error := json.Unmarshal(body, &lb)
-	if error != nil {
-		return error
+	unmarshalErr := json.Unmarshal(body, &lb)
+	if unmarshalErr != nil {
+		writeMetricError(metricHarborElbRead, unmarshalErr)
+		return unmarshalErr
 	}
 
 	//query aws for the lb dns name
@@ -88,10 +93,14 @@ func dataSourceHarborElbRead(d *schema.ResourceData, meta interface{}) error {
 
 	describeResp, awserr := elbconn.DescribeLoadBalancers(describeElbOpts)
 	if err != nil {
-		return fmt.Errorf("Error retrieving ELB: %s", awserr)
+		newErr := fmt.Errorf("Error retrieving ELB: %s", awserr)
+		writeMetricError(metricHarborElbRead, newErr)
+		return newErr
 	}
 	if describeResp == nil || describeResp.LoadBalancerDescriptions == nil || len(describeResp.LoadBalancerDescriptions) == 0 {
-		return errors.New("load balancer not found")
+		newErr := errors.New("load balancer not found")
+		writeMetricError(metricHarborElbRead, newErr)
+		return newErr
 	}
 
 	//output task definition json

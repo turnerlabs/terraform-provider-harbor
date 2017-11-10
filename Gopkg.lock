@@ -109,6 +109,12 @@
   version = "0.2.2"
 
 [[projects]]
+  name = "github.com/jtacoma/uritemplates"
+  packages = ["."]
+  revision = "307ae868f90f4ee1b73ebe4596e0394237dacce8"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/mitchellh/copystructure"
   packages = ["."]
@@ -201,6 +207,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "99c934586fe18275b2f4b210b58e9bef4974f91e9c4e1b147f8921474296cfd2"
+  inputs-digest = "7147bbcace596476b18d5ee16cfa73b1869be8d42c3e1f2c1fb6e38dcf24448f"
   solver-name = "gps-cdcl"
   solver-version = 1

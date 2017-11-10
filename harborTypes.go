@@ -53,16 +53,17 @@ type DockerComposeService struct {
 
 // ShipmentEnvironment represents a shipment/environment combination
 type ShipmentEnvironment struct {
-	Username         string             `json:"username"`
-	Token            string             `json:"token"`
-	Name             string             `json:"name"`
-	EnvVars          []EnvVarPayload    `json:"envVars"`
-	Ports            []PortPayload      `json:"ports"`
-	Containers       []ContainerPayload `json:"containers"`
-	Providers        []ProviderPayload  `json:"providers"`
-	ParentShipment   ParentShipment     `json:"parentShipment"`
-	BuildToken       string             `json:"buildToken,omitempty"`
-	EnableMonitoring bool               `json:"enableMonitoring"`
+	Username         string               `json:"username"`
+	Token            string               `json:"token"`
+	Name             string               `json:"name"`
+	EnvVars          []EnvVarPayload      `json:"envVars,omitempty"`
+	Ports            []PortPayload        `json:"ports,omitempty"`
+	Containers       []ContainerPayload   `json:"containers,omitempty"`
+	Providers        []ProviderPayload    `json:"providers,omitempty"`
+	Annotations      []AnnotationsPayload `json:"annotations"`
+	ParentShipment   ParentShipment       `json:"parentShipment"`
+	BuildToken       string               `json:"buildToken,omitempty"`
+	EnableMonitoring bool                 `json:"enableMonitoring"`
 }
 
 // The ParentShipment of the shipmentModel
@@ -81,11 +82,11 @@ type EnvVarPayload struct {
 
 // PortPayload represents a port
 type PortPayload struct {
-	Name                string `json:"name,omitempty"`
+	Name                string `json:"name"`
 	Value               int    `json:"value,omitempty"`
 	Protocol            string `json:"protocol,omitempty"`
 	Healthcheck         string `json:"healthcheck,omitempty"`
-	Primary             bool   `json:"primary,omitempty"`
+	Primary             bool   `json:"primary"`
 	External            bool   `json:"external,omitempty"`
 	PublicVip           bool   `json:"public_vip,omitempty"`
 	PublicPort          int    `json:"public_port,omitempty"`
@@ -110,6 +111,11 @@ type ProviderPayload struct {
 	Replicas int             `json:"replicas"`
 	EnvVars  []EnvVarPayload `json:"envVars,omitempty"`
 	Barge    string          `json:"barge,omitempty"`
+}
+
+type AnnotationsPayload struct {
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // TriggerResponseSingle is the payload returned from the trigger api
