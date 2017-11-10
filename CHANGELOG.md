@@ -1,3 +1,23 @@
+## 0.4.0 (2017-11-10)
+
+Features:
+
+- Move healthcheck, timeout, interval to container level ([#5](https://github.com/turnerlabs/terraform-provider-harbor/issues/5))
+
+- Support for multiple containers ([#7](https://github.com/turnerlabs/terraform-provider-harbor/issues/7))
+
+- Support for log shipping ([#6](https://github.com/turnerlabs/terraform-provider-harbor/issues/6))
+
+- Support for terraform import ([#9](https://github.com/turnerlabs/terraform-provider-harbor/issues/9))
+
+- Support for annotations ([#14](https://github.com/turnerlabs/terraform-provider-harbor/issues/14))
+
+- telemetry integration ([#20](https://github.com/turnerlabs/terraform-provider-harbor/issues/20))
+
+- documentation ([#23](https://github.com/turnerlabs/terraform-provider-harbor/issues/23))
+
+
+
 ## 0.3.0 (2017-10-02)
 
 Features:
