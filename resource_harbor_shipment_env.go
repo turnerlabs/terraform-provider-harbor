@@ -304,7 +304,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		time.Sleep(10 * time.Second)
 	}
 	if len(lbStatus.LoadBalancers) < 1 {
-		newErr := errors.New("no load balancers")
+		newErr := errors.New("load balancer not found")
 		writeMetricError(metricEnvCreate, newErr)
 		return newErr
 	}
@@ -313,12 +313,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
 
 	//output attributes
-	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipmentName, environment))
-	d.Set("lb_name", lbStatus.LoadBalancers[0].LoadBalancerName)
-	d.Set("lb_type", lbStatus.LoadBalancers[0].Type)
-	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
-	d.Set("lb_dns_name", lbStatus.LoadBalancers[0].DNSName)
-	d.Set("lb_hosted_zone_id", lbStatus.LoadBalancers[0].CanonicalHostedZoneID)
+	setComputedAttributes(d, shipmentName, environment, lbStatus.LoadBalancers[0])
 
 	return nil
 }
@@ -337,7 +332,7 @@ func validateShipmentEnvironment(shipmentEnv *ShipmentEnvironment) error {
 			if port.Healthcheck != "" {
 				hcPorts++
 				if hcPorts > 1 {
-					return fmt.Errorf("Container '%v' must have only 1 healthcheck port. Please remove the healthcheck from the other ports.", container.Name)
+					return fmt.Errorf("container '%v' must have only 1 healthcheck port. Please remove the healthcheck from the other ports", container.Name)
 				}
 			}
 			if port.Primary {
@@ -445,7 +440,30 @@ func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interf
 		return nil, err
 	}
 
+	//call the load balancer api
+	lbStatus, err := getLoadBalancerStatus(shipment, env)
+	if err != nil {
+		return nil, err
+	}
+	if len(lbStatus.LoadBalancers) < 1 {
+		newErr := errors.New("load balancer not found")
+		writeMetricError(metricEnvCreate, newErr)
+		return nil, newErr
+	}
+
+	//set computed attributes
+	setComputedAttributes(d, shipment, env, lbStatus.LoadBalancers[0])
+
 	return []*schema.ResourceData{d}, nil
+}
+
+func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb LoadBalancer) {
+	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipment, environment))
+	d.Set("lb_name", lb.LoadBalancerName)
+	d.Set("lb_type", lb.Type)
+	d.Set("lb_arn", lb.LoadBalancerArn)
+	d.Set("lb_dns_name", lb.DNSName)
+	d.Set("lb_hosted_zone_id", lb.CanonicalHostedZoneID)
 }
 
 //make updates to remote resource (use shipit bulk and trigger)

@@ -113,6 +113,7 @@ type ProviderPayload struct {
 	Barge    string          `json:"barge,omitempty"`
 }
 
+// AnnotationsPayload represents annotations
 type AnnotationsPayload struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
@@ -240,25 +241,28 @@ type Shipment struct {
 	EnvVars []EnvVarPayload `json:"envVars,omitempty"`
 }
 
+// LoadBalancer represents a load balancer
+type LoadBalancer struct {
+	LoadBalancerArn       string `json:"load_balancer_arn"`
+	DNSName               string `json:"dns_name"`
+	CanonicalHostedZoneID string `json:"canonical_hosted_zone_id"`
+	CreatedTime           string `json:"created_time"`
+	LoadBalancerName      string `json:"load_balancer_name"`
+	Scheme                string `json:"scheme"`
+	VpcID                 string `json:"vpc_id"`
+	State                 struct {
+		Code string `json:"code"`
+	} `json:"state"`
+	Type              string `json:"type"`
+	AvailabilityZones []struct {
+		ZoneName string `json:"zone_name"`
+		SubnetID string `json:"subnet_id"`
+	} `json:"availability_zones"`
+	SecurityGroups []string `json:"security_groups"`
+	IPAddressType  string   `json:"ip_address_type"`
+}
+
 type getLoadBalancerStatusResponse struct {
-	LoadBalancers []struct {
-		LoadBalancerArn       string `json:"load_balancer_arn"`
-		DNSName               string `json:"dns_name"`
-		CanonicalHostedZoneID string `json:"canonical_hosted_zone_id"`
-		CreatedTime           string `json:"created_time"`
-		LoadBalancerName      string `json:"load_balancer_name"`
-		Scheme                string `json:"scheme"`
-		VpcID                 string `json:"vpc_id"`
-		State                 struct {
-			Code string `json:"code"`
-		} `json:"state"`
-		Type              string `json:"type"`
-		AvailabilityZones []struct {
-			ZoneName string `json:"zone_name"`
-			SubnetID string `json:"subnet_id"`
-		} `json:"availability_zones"`
-		SecurityGroups []string `json:"security_groups"`
-		IPAddressType  string   `json:"ip_address_type"`
-	} `json:"load_balancers"`
-	LbName string `json:"lb_name"`
+	LoadBalancers []LoadBalancer `json:"load_balancers"`
+	LbName        string         `json:"lb_name"`
 }
