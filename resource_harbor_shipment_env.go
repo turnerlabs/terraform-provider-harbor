@@ -234,11 +234,18 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"build_token": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
 
 func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
+	if Verbose {
+		log.Println("resourceHarborShipmentEnvironmentCreate enter")
+	}
 	harborMeta := meta.(*harborMeta)
 	auth := harborMeta.auth
 
@@ -275,7 +282,12 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 
 	//save shipment/environment
 	writeMetric(metricEnvCreate)
-	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	saveSuccess, buildToken := SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	if !saveSuccess {
+		newErr := fmt.Errorf("SaveShipmentEnvironment failed")
+		writeMetricError(metricEnvCreate, newErr)
+		return newErr
+	}
 
 	//trigger shipment
 	success, messages := Trigger(shipmentName, environment)
@@ -313,7 +325,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
 
 	//output attributes
-	setComputedAttributes(d, shipmentName, environment, lbStatus.LoadBalancers[0])
+	setComputedAttributes(d, shipmentName, environment, lbStatus.LoadBalancers[0], buildToken)
 
 	return nil
 }
@@ -452,18 +464,19 @@ func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interf
 	}
 
 	//set computed attributes
-	setComputedAttributes(d, shipment, env, lbStatus.LoadBalancers[0])
+	setComputedAttributes(d, shipment, env, lbStatus.LoadBalancers[0], shipmentEnv.BuildToken)
 
 	return []*schema.ResourceData{d}, nil
 }
 
-func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb LoadBalancer) {
+func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb LoadBalancer, buildToken string) {
 	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipment, environment))
 	d.Set("lb_name", lb.LoadBalancerName)
 	d.Set("lb_type", lb.Type)
 	d.Set("lb_arn", lb.LoadBalancerArn)
 	d.Set("lb_dns_name", lb.DNSName)
 	d.Set("lb_hosted_zone_id", lb.CanonicalHostedZoneID)
+	d.Set("build_token", buildToken)
 }
 
 //make updates to remote resource (use shipit bulk and trigger)
@@ -514,6 +527,20 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		writeMetricError(metricEnvUpdate, newErr)
 		return newErr
 	}
+
+	//call the load balancer api
+	lbStatus, err := getLoadBalancerStatus(shipmentName, env)
+	if err != nil {
+		return err
+	}
+	if len(lbStatus.LoadBalancers) < 1 {
+		newErr := errors.New("load balancer not found")
+		writeMetricError(metricEnvCreate, newErr)
+		return newErr
+	}
+
+	//set computed attributes
+	setComputedAttributes(d, shipmentName, env, lbStatus.LoadBalancers[0], shipmentEnv.BuildToken)
 
 	return nil
 }
@@ -652,6 +679,9 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 	//copy over any existing user-defined environment-level env vars
 	if existingShipmentEnvironment != nil {
 		result.EnvVars = copyUserDefinedEnvVars(existingShipmentEnvironment.EnvVars)
+
+		//preserve build token
+		result.BuildToken = existingShipmentEnvironment.BuildToken
 	}
 
 	// annotations

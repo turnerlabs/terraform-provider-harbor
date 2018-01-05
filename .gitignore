@@ -15,8 +15,10 @@ test-server/test-server
 .vscode
 flow.md
 z.log
+tf.log
 build.sh
 mapping-complex.png
 mapping-simple.png
 mapping-complex2.png
 .editorconfig
+terraform-provider-harbor_v0-local
