@@ -379,9 +379,9 @@ func Trigger(shipment string, env string) (bool, []string) {
 	return resp.StatusCode == http.StatusOK, result
 }
 
-func getLoadBalancerStatus(shipment string, env string) (*getLoadBalancerStatusResponse, error) {
+func getLoadBalancerStatus(shipment string, env string) (*LoadBalancer, error) {
 
-	uri := triggerURI("/loadbalancer/status/{shipment}/{env}/{provider}",
+	uri := triggerURI("/v2/loadbalancer/status/{shipment}/{env}/{provider}",
 		param("shipment", shipment),
 		param("env", env),
 		param("provider", providerEc2))
@@ -396,7 +396,7 @@ func getLoadBalancerStatus(shipment string, env string) (*getLoadBalancerStatusR
 		return nil, err[0]
 	}
 
-	var result getLoadBalancerStatusResponse
+	var result LoadBalancer
 	if res.StatusCode == http.StatusOK {
 		if Verbose {
 			log.Println(string(body))
@@ -405,9 +405,11 @@ func getLoadBalancerStatus(shipment string, env string) (*getLoadBalancerStatusR
 		if unmarshalErr != nil {
 			return nil, unmarshalErr
 		}
-	} else if res.StatusCode == http.StatusInternalServerError {
-		//api returns 500 until the lb is ready
-		return nil, nil
+
+		//return nil if the lb isn't active
+		if result.State != "active" {
+			return nil,nil
+		}
 	} else {
 		return nil, fmt.Errorf("get lb status returned: %v; %v", res.StatusCode, string(body))
 	}
