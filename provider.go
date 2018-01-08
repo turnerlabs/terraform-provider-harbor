@@ -44,6 +44,9 @@ func Provider() *schema.Provider {
 			"harbor_shipment":     resourceHarborShipment(),
 			"harbor_shipment_env": resourceHarborShipmentEnv(),
 		},
+		DataSourcesMap: map[string]*schema.Resource{
+			"harbor_loadbalancer": dataSourceHarborLoadbalancer(),
+		},
 		ConfigureFunc: providerConfigure,
 	}
 }

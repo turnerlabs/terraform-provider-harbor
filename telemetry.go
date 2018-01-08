@@ -30,7 +30,7 @@ const (
 	metricEnvDelete = "env.delete"
 	metricEnvImport = "env.import"
 
-	metricHarborElbRead = "harbor_elb.read"
+	metricHarborLoadbalancerRead = "harbor_loadbalancer.read"
 )
 
 func writeMetric(action string) {
