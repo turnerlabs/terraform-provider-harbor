@@ -401,14 +401,10 @@ func getLoadBalancerStatus(shipment string, env string) (*LoadBalancer, error) {
 		if Verbose {
 			log.Println(string(body))
 		}
+
 		unmarshalErr := json.Unmarshal(body, &result)
 		if unmarshalErr != nil {
 			return nil, unmarshalErr
-		}
-
-		//return nil if the lb isn't active
-		if result.State != "active" {
-			return nil,nil
 		}
 	} else {
 		return nil, fmt.Errorf("get lb status returned: %v; %v", res.StatusCode, string(body))

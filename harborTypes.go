@@ -95,6 +95,7 @@ type PortPayload struct {
 	SslManagementType   string `json:"ssl_management_type,omitempty"`
 	HealthcheckTimeout  *int   `json:"healthcheck_timeout,omitempty"`
 	HealthcheckInterval *int   `json:"healthcheck_interval,omitempty"`
+	LBType              string `json:"lbtype,omitempty"`
 }
 
 // ContainerPayload represents a container payload

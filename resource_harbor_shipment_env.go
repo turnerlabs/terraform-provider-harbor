@@ -52,6 +52,12 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
+			"loadbalancer": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "default",
+				ForceNew: true,
+			},
 			"log_shipping": &schema.Schema{
 				Description: "Configure harbor log shipping",
 				Optional:    true,
@@ -308,10 +314,21 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 		if err != nil {
 			return err
 		}
+
+		//load balancer state should go from "provisioning" to "active"
 		if result != nil {
-			lbStatus = result
-			break
+
+			//exist polling loop when active
+			if strings.HasPrefix(result.State, "active") {
+				lbStatus = result
+				break
+			}
+
+			if result.State != "provisioning" {
+				return errors.New("LB state = " + result.State)
+			}
 		}
+
 		//wait a few seconds
 		time.Sleep(10 * time.Second)
 	}
@@ -627,6 +644,10 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 				c["primary"] = true
 			}
 
+			//set shipment/environment's loadbalancer based on
+			//the lbtype value of the primary container's primary port
+			d.Set("loadbalancer", port.LBType)
+
 			ports[j] = p
 		}
 		c["port"] = ports
@@ -799,6 +820,9 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 							//make this port primary if it's an hc port and the container is marked as primary
 							if isContainerPrimary := ctr["primary"].(bool); isContainerPrimary {
 								p.Primary = true
+
+								//set the lbtype property
+								p.LBType = d.Get("loadbalancer").(string)
 							}
 						}
 					} else {
