@@ -52,6 +52,12 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
+			"loadbalancer": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "default",
+				ForceNew: true,
+			},
 			"log_shipping": &schema.Schema{
 				Description: "Configure harbor log shipping",
 				Optional:    true,
@@ -302,30 +308,36 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	//poll lb endpoint until it's ready
-	var lbStatus *getLoadBalancerStatusResponse
+	var lbStatus *LoadBalancer
 	for {
 		result, err := getLoadBalancerStatus(shipmentName, environment)
 		if err != nil {
 			return err
 		}
+
+		//load balancer state should go from "provisioning" to "active"
 		if result != nil {
-			lbStatus = result
-			break
+
+			//exist polling loop when active
+			if strings.HasPrefix(result.State, "active") {
+				lbStatus = result
+				break
+			}
+
+			if result.State != "provisioning" {
+				return errors.New("LB state = " + result.State)
+			}
 		}
+
 		//wait a few seconds
 		time.Sleep(10 * time.Second)
-	}
-	if len(lbStatus.LoadBalancers) < 1 {
-		newErr := errors.New("load balancer not found")
-		writeMetricError(metricEnvCreate, newErr)
-		return newErr
 	}
 
 	//output id
 	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
 
 	//output attributes
-	setComputedAttributes(d, shipmentName, environment, lbStatus.LoadBalancers[0], buildToken)
+	setComputedAttributes(d, shipmentName, environment, lbStatus, buildToken)
 
 	return nil
 }
@@ -457,23 +469,18 @@ func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interf
 	if err != nil {
 		return nil, err
 	}
-	if len(lbStatus.LoadBalancers) < 1 {
-		newErr := errors.New("load balancer not found")
-		writeMetricError(metricEnvCreate, newErr)
-		return nil, newErr
-	}
 
 	//set computed attributes
-	setComputedAttributes(d, shipment, env, lbStatus.LoadBalancers[0], shipmentEnv.BuildToken)
+	setComputedAttributes(d, shipment, env, lbStatus, shipmentEnv.BuildToken)
 
 	return []*schema.ResourceData{d}, nil
 }
 
-func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb LoadBalancer, buildToken string) {
+func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb *LoadBalancer, buildToken string) {
 	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipment, environment))
-	d.Set("lb_name", lb.LoadBalancerName)
+	d.Set("lb_name", lb.Name)
 	d.Set("lb_type", lb.Type)
-	d.Set("lb_arn", lb.LoadBalancerArn)
+	d.Set("lb_arn", lb.ARN)
 	d.Set("lb_dns_name", lb.DNSName)
 	d.Set("lb_hosted_zone_id", lb.CanonicalHostedZoneID)
 	d.Set("build_token", buildToken)
@@ -533,14 +540,9 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	if err != nil {
 		return err
 	}
-	if len(lbStatus.LoadBalancers) < 1 {
-		newErr := errors.New("load balancer not found")
-		writeMetricError(metricEnvCreate, newErr)
-		return newErr
-	}
 
 	//set computed attributes
-	setComputedAttributes(d, shipmentName, env, lbStatus.LoadBalancers[0], shipmentEnv.BuildToken)
+	setComputedAttributes(d, shipmentName, env, lbStatus, shipmentEnv.BuildToken)
 
 	return nil
 }
@@ -641,6 +643,10 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			if port.Primary {
 				c["primary"] = true
 			}
+
+			//set shipment/environment's loadbalancer based on
+			//the lbtype value of the primary container's primary port
+			d.Set("loadbalancer", port.LBType)
 
 			ports[j] = p
 		}
@@ -814,6 +820,9 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 							//make this port primary if it's an hc port and the container is marked as primary
 							if isContainerPrimary := ctr["primary"].(bool); isContainerPrimary {
 								p.Primary = true
+
+								//set the lbtype property
+								p.LBType = d.Get("loadbalancer").(string)
 							}
 						}
 					} else {
