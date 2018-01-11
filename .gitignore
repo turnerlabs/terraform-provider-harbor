@@ -22,3 +22,6 @@ mapping-simple.png
 mapping-complex2.png
 .editorconfig
 terraform-provider-harbor_v0-local
+hidden.env
+cert.pem
+key.pem

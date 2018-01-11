@@ -82,20 +82,23 @@ type EnvVarPayload struct {
 
 // PortPayload represents a port
 type PortPayload struct {
-	Name                string `json:"name"`
-	Value               int    `json:"value,omitempty"`
-	Protocol            string `json:"protocol,omitempty"`
-	Healthcheck         string `json:"healthcheck,omitempty"`
-	Primary             bool   `json:"primary"`
-	External            bool   `json:"external,omitempty"`
-	PublicVip           bool   `json:"public_vip,omitempty"`
-	PublicPort          int    `json:"public_port,omitempty"`
-	EnableProxyProtocol bool   `json:"enable_proxy_protocol,omitempty"`
-	SslArn              string `json:"ssl_arn,omitempty"`
-	SslManagementType   string `json:"ssl_management_type,omitempty"`
-	HealthcheckTimeout  *int   `json:"healthcheck_timeout,omitempty"`
-	HealthcheckInterval *int   `json:"healthcheck_interval,omitempty"`
-	LBType              string `json:"lbtype,omitempty"`
+	Name                 string `json:"name"`
+	Value                int    `json:"value,omitempty"`
+	Protocol             string `json:"protocol,omitempty"`
+	Healthcheck          string `json:"healthcheck,omitempty"`
+	Primary              bool   `json:"primary"`
+	External             bool   `json:"external,omitempty"`
+	PublicVip            bool   `json:"public_vip,omitempty"`
+	PublicPort           int    `json:"public_port,omitempty"`
+	EnableProxyProtocol  bool   `json:"enable_proxy_protocol,omitempty"`
+	SslArn               string `json:"ssl_arn,omitempty"`
+	SslManagementType    string `json:"ssl_management_type,omitempty"`
+	PrivateKey           string `json:"private_key,omitempty"`
+	PublicKeyCertificate string `json:"public_key_certificate,omitempty"`
+	CertificateChain     string `json:"certificate_chain,omitempty"`
+	HealthcheckTimeout   *int   `json:"healthcheck_timeout,omitempty"`
+	HealthcheckInterval  *int   `json:"healthcheck_interval,omitempty"`
+	LBType               string `json:"lbtype,omitempty"`
 }
 
 // ContainerPayload represents a container payload

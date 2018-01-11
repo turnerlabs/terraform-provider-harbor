@@ -632,11 +632,14 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			p["external"] = port.External
 			p["protocol"] = port.Protocol
 			p["enable_proxy_protocol"] = port.EnableProxyProtocol
-			p["ssl_arn"] = port.SslArn
-			p["ssl_management_type"] = port.SslManagementType
 			p["healthcheck"] = port.Healthcheck
 			p["healthcheck_timeout"] = *port.HealthcheckTimeout
 			p["healthcheck_interval"] = *port.HealthcheckInterval
+			p["ssl_management_type"] = port.SslManagementType
+			p["ssl_arn"] = port.SslArn
+			p["private_key"] = port.PrivateKey
+			p["public_key_certificate"] = port.PublicKeyCertificate
+			p["certificate_chain"] = port.CertificateChain
 
 			//set container as primary since it contains the shipment/env's primary port
 			//and there can only be 1 per shipment/env
@@ -798,8 +801,11 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
 						p.External = portMap["external"].(bool)
 						p.PublicVip = portMap["public"].(bool)
-						p.SslArn = portMap["ssl_arn"].(string)
 						p.SslManagementType = portMap["ssl_management_type"].(string)
+						p.SslArn = portMap["ssl_arn"].(string)
+						p.PrivateKey = portMap["private_key"].(string)
+						p.PublicKeyCertificate = portMap["public_key_certificate"].(string)
+						p.CertificateChain = portMap["certificate_chain"].(string)
 
 						//healthcheck
 						p.Healthcheck = portMap["healthcheck"].(string)
