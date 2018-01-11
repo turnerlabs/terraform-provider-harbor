@@ -20,3 +20,5 @@ certificate_chain      = ""
 ```
 terraform apply
 ```
+
+For additional information on requesting a turner.com certificate and configuring the `certificate_chain`, please refer to [this post](http://blog.harbor.inturner.io/articles/shipment-ssl-howto/).
