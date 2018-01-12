@@ -31,12 +31,17 @@ curl -s get-tf.harbor.turnerlabs.io | sh
 curl -s get-cli.harbor.turnerlabs.io | sh
 ```
 
+- *note that you can install the pre-release (develop branch) using this command
+```
+curl -s beta.get-tf.harbor.turnerlabs.io | sh
+```
+
 [Provider Documentation](wiki)
 
 
 ### Usage example
 
-```terraform
+```hcl
 provider "harbor" {
   credentials = "${file("~/.harbor/credentials")}"
 }
@@ -52,11 +57,6 @@ resource "harbor_shipment_env" "dev" {
   barge       = "digital-sandbox"
   replicas    = 4
   monitored   = false
-
-  annotations {
-    foo = "foo value"
-    bar = "bar value"
-  }
 
   container {
     name = "my-app"
@@ -77,4 +77,7 @@ output "dns_name" {
 
 ### Other examples
 
-- [DNS and SSL](examples/dns-ssl)
+- [Log Shipping](examples/log-shipping)
+- [DNS and TLS/HTTPS using AWS](examples/dns-ssl)
+- [TLS/HTTPS using an IAM certificate](examples/iam-cert)
+- [Multiple Environments](examples/multi-environment)
