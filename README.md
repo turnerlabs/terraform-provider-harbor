@@ -81,3 +81,4 @@ output "dns_name" {
 - [DNS and TLS/HTTPS using AWS](examples/dns-ssl)
 - [TLS/HTTPS using an IAM certificate](examples/iam-cert)
 - [Multiple Environments](examples/multi-environment)
+- [ALB Load Balancer](examples/lb-alb)
