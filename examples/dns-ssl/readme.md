@@ -1,4 +1,4 @@
-### DNS and SSL example
+### DNS and SSL example using AWS
 
 - attaches a friendly DNS name to the shipment's default DNS
 - configures TLS/SSL on the shipment by attaching an ACM certificate

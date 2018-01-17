@@ -52,6 +52,12 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeBool,
 				Required: true,
 			},
+			"loadbalancer": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "default",
+				ForceNew: true,
+			},
 			"log_shipping": &schema.Schema{
 				Description: "Configure harbor log shipping",
 				Optional:    true,
@@ -234,11 +240,18 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"build_token": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
 
 func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
+	if Verbose {
+		log.Println("resourceHarborShipmentEnvironmentCreate enter")
+	}
 	harborMeta := meta.(*harborMeta)
 	auth := harborMeta.auth
 
@@ -275,7 +288,12 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 
 	//save shipment/environment
 	writeMetric(metricEnvCreate)
-	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	saveSuccess, buildToken := SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
+	if !saveSuccess {
+		newErr := fmt.Errorf("SaveShipmentEnvironment failed")
+		writeMetricError(metricEnvCreate, newErr)
+		return newErr
+	}
 
 	//trigger shipment
 	success, messages := Trigger(shipmentName, environment)
@@ -290,35 +308,36 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	//poll lb endpoint until it's ready
-	var lbStatus *getLoadBalancerStatusResponse
+	var lbStatus *LoadBalancer
 	for {
 		result, err := getLoadBalancerStatus(shipmentName, environment)
 		if err != nil {
 			return err
 		}
+
+		//load balancer state should go from "provisioning" to "active"
 		if result != nil {
-			lbStatus = result
-			break
+
+			//exist polling loop when active
+			if strings.HasPrefix(result.State, "active") {
+				lbStatus = result
+				break
+			}
+
+			if result.State != "provisioning" {
+				return errors.New("LB state = " + result.State)
+			}
 		}
+
 		//wait a few seconds
 		time.Sleep(10 * time.Second)
-	}
-	if len(lbStatus.LoadBalancers) < 1 {
-		newErr := errors.New("no load balancers")
-		writeMetricError(metricEnvCreate, newErr)
-		return newErr
 	}
 
 	//output id
 	d.SetId(fmt.Sprintf("%s::%s", shipmentEnv.ParentShipment.Name, shipmentEnv.Name))
 
 	//output attributes
-	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipmentName, environment))
-	d.Set("lb_name", lbStatus.LoadBalancers[0].LoadBalancerName)
-	d.Set("lb_type", lbStatus.LoadBalancers[0].Type)
-	d.Set("lb_arn", lbStatus.LoadBalancers[0].LoadBalancerArn)
-	d.Set("lb_dns_name", lbStatus.LoadBalancers[0].DNSName)
-	d.Set("lb_hosted_zone_id", lbStatus.LoadBalancers[0].CanonicalHostedZoneID)
+	setComputedAttributes(d, shipmentName, environment, lbStatus, buildToken)
 
 	return nil
 }
@@ -337,7 +356,7 @@ func validateShipmentEnvironment(shipmentEnv *ShipmentEnvironment) error {
 			if port.Healthcheck != "" {
 				hcPorts++
 				if hcPorts > 1 {
-					return fmt.Errorf("Container '%v' must have only 1 healthcheck port. Please remove the healthcheck from the other ports.", container.Name)
+					return fmt.Errorf("container '%v' must have only 1 healthcheck port. Please remove the healthcheck from the other ports", container.Name)
 				}
 			}
 			if port.Primary {
@@ -445,7 +464,26 @@ func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interf
 		return nil, err
 	}
 
+	//call the load balancer api
+	lbStatus, err := getLoadBalancerStatus(shipment, env)
+	if err != nil {
+		return nil, err
+	}
+
+	//set computed attributes
+	setComputedAttributes(d, shipment, env, lbStatus, shipmentEnv.BuildToken)
+
 	return []*schema.ResourceData{d}, nil
+}
+
+func setComputedAttributes(d *schema.ResourceData, shipment string, environment string, lb *LoadBalancer, buildToken string) {
+	d.Set("dns_name", fmt.Sprintf("%v.%v.services.ec2.dmtio.net", shipment, environment))
+	d.Set("lb_name", lb.Name)
+	d.Set("lb_type", lb.Type)
+	d.Set("lb_arn", lb.ARN)
+	d.Set("lb_dns_name", lb.DNSName)
+	d.Set("lb_hosted_zone_id", lb.CanonicalHostedZoneID)
+	d.Set("build_token", buildToken)
 }
 
 //make updates to remote resource (use shipit bulk and trigger)
@@ -496,6 +534,15 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 		writeMetricError(metricEnvUpdate, newErr)
 		return newErr
 	}
+
+	//call the load balancer api
+	lbStatus, err := getLoadBalancerStatus(shipmentName, env)
+	if err != nil {
+		return err
+	}
+
+	//set computed attributes
+	setComputedAttributes(d, shipmentName, env, lbStatus, shipmentEnv.BuildToken)
 
 	return nil
 }
@@ -585,17 +632,24 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 			p["external"] = port.External
 			p["protocol"] = port.Protocol
 			p["enable_proxy_protocol"] = port.EnableProxyProtocol
-			p["ssl_arn"] = port.SslArn
-			p["ssl_management_type"] = port.SslManagementType
 			p["healthcheck"] = port.Healthcheck
 			p["healthcheck_timeout"] = *port.HealthcheckTimeout
 			p["healthcheck_interval"] = *port.HealthcheckInterval
+			p["ssl_management_type"] = port.SslManagementType
+			p["ssl_arn"] = port.SslArn
+			p["private_key"] = port.PrivateKey
+			p["public_key_certificate"] = port.PublicKeyCertificate
+			p["certificate_chain"] = port.CertificateChain
 
 			//set container as primary since it contains the shipment/env's primary port
 			//and there can only be 1 per shipment/env
 			if port.Primary {
 				c["primary"] = true
 			}
+
+			//set shipment/environment's loadbalancer based on
+			//the lbtype value of the primary container's primary port
+			d.Set("loadbalancer", port.LBType)
 
 			ports[j] = p
 		}
@@ -634,6 +688,9 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 	//copy over any existing user-defined environment-level env vars
 	if existingShipmentEnvironment != nil {
 		result.EnvVars = copyUserDefinedEnvVars(existingShipmentEnvironment.EnvVars)
+
+		//preserve build token
+		result.BuildToken = existingShipmentEnvironment.BuildToken
 	}
 
 	// annotations
@@ -744,8 +801,11 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 						p.EnableProxyProtocol = portMap["enable_proxy_protocol"].(bool)
 						p.External = portMap["external"].(bool)
 						p.PublicVip = portMap["public"].(bool)
-						p.SslArn = portMap["ssl_arn"].(string)
 						p.SslManagementType = portMap["ssl_management_type"].(string)
+						p.SslArn = portMap["ssl_arn"].(string)
+						p.PrivateKey = portMap["private_key"].(string)
+						p.PublicKeyCertificate = portMap["public_key_certificate"].(string)
+						p.CertificateChain = portMap["certificate_chain"].(string)
 
 						//healthcheck
 						p.Healthcheck = portMap["healthcheck"].(string)
@@ -766,6 +826,9 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 							//make this port primary if it's an hc port and the container is marked as primary
 							if isContainerPrimary := ctr["primary"].(bool); isContainerPrimary {
 								p.Primary = true
+
+								//set the lbtype property
+								p.LBType = d.Get("loadbalancer").(string)
 							}
 						}
 					} else {

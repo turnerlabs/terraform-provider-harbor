@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 )
 
@@ -29,7 +30,7 @@ const (
 	metricEnvDelete = "env.delete"
 	metricEnvImport = "env.import"
 
-	metricHarborElbRead = "harbor_elb.read"
+	metricHarborLoadbalancerRead = "harbor_loadbalancer.read"
 )
 
 func writeMetric(action string) {
@@ -42,20 +43,24 @@ func writeMetricError(action string, err error) {
 
 func writeMetricErrorString(action string, err string) {
 
-	m := metric{
-		Source: "terraform-provider-harbor",
-		Action: action,
-		Error:  err,
-		OS:     runtime.GOOS,
-		Arch:   runtime.GOARCH,
-	}
+	// HARBOR_TELEMETRY=0 disables telemetry
+	if setting := os.Getenv("HARBOR_TELEMETRY"); setting != "0" {
 
-	if Verbose {
-		log.Println("posting telemetry data")
-	}
+		m := metric{
+			Source: "terraform-provider-harbor",
+			Action: action,
+			Error:  err,
+			OS:     runtime.GOOS,
+			Arch:   runtime.GOARCH,
+		}
 
-	//talk to the server in the background to keep things moving
-	go postTelemetryData(m)
+		if Verbose {
+			log.Println("posting telemetry data")
+		}
+
+		//talk to the server in the background to keep things moving
+		go postTelemetryData(m)
+	}
 }
 
 func postTelemetryData(m metric) {

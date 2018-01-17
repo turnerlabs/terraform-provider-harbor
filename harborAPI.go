@@ -379,9 +379,9 @@ func Trigger(shipment string, env string) (bool, []string) {
 	return resp.StatusCode == http.StatusOK, result
 }
 
-func getLoadBalancerStatus(shipment string, env string) (*getLoadBalancerStatusResponse, error) {
+func getLoadBalancerStatus(shipment string, env string) (*LoadBalancer, error) {
 
-	uri := triggerURI("/loadbalancer/status/{shipment}/{env}/{provider}",
+	uri := triggerURI("/v2/loadbalancer/status/{shipment}/{env}/{provider}",
 		param("shipment", shipment),
 		param("env", env),
 		param("provider", providerEc2))
@@ -396,18 +396,16 @@ func getLoadBalancerStatus(shipment string, env string) (*getLoadBalancerStatusR
 		return nil, err[0]
 	}
 
-	var result getLoadBalancerStatusResponse
+	var result LoadBalancer
 	if res.StatusCode == http.StatusOK {
 		if Verbose {
 			log.Println(string(body))
 		}
+
 		unmarshalErr := json.Unmarshal(body, &result)
 		if unmarshalErr != nil {
 			return nil, unmarshalErr
 		}
-	} else if res.StatusCode == http.StatusInternalServerError {
-		//api returns 500 until the lb is ready
-		return nil, nil
 	} else {
 		return nil, fmt.Errorf("get lb status returned: %v; %v", res.StatusCode, string(body))
 	}
@@ -568,7 +566,8 @@ func sortData(shipmentEnv *ShipmentEnvironment) {
 }
 
 // SaveShipmentEnvironment bulk saves a new shipment/environment
-func SaveShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) bool {
+//and returns the build token
+func SaveShipmentEnvironment(username string, token string, shipment ShipmentEnvironment) (bool, string) {
 
 	var config = GetConfig()
 	shipment.Username = username
@@ -580,18 +579,34 @@ func SaveShipmentEnvironment(username string, token string, shipment ShipmentEnv
 	//POST /api/v1/shipments
 	res, body, err := create(username, token, config.ShipitURI+"/v1/bulk/shipments", shipment)
 
-	if err != nil || res.StatusCode != http.StatusCreated {
+	if err != nil || !(res.StatusCode == http.StatusCreated || res.StatusCode == http.StatusOK) {
 		fmt.Printf("creating shipment was not successful: %v\ncode: %v\n", body, res.StatusCode)
-		return false
+		return false, ""
 	}
+
+	success := true
+	buildToken := ""
 
 	//api returns an object with an errors property that is
 	//false when there are no errors and an object if there are
-	if !strings.Contains(body, "errors\": false") {
-		return false
+	if strings.Contains(body, "errors\": {") {
+		success = false
+		if Verbose {
+			log.Println(body)
+		}
 	}
 
-	return true
+	if success {
+		//deserialize response to get the outputted build token
+		var newShipment ShipmentEnvironment
+		unmarshalErr := json.Unmarshal([]byte(body), &newShipment)
+		if unmarshalErr != nil {
+			log.Fatal(unmarshalErr)
+		}
+		buildToken = newShipment.BuildToken
+	}
+
+	return success, buildToken
 }
 
 // DeleteShipmentEnvironment deletes a shipment/environment from harbor

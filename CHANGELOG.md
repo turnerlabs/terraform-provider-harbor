@@ -1,3 +1,26 @@
+## 0.5.0 (2018-01-17)
+
+Features:
+
+- Implement lbtype (support for ELB) ([#13](https://github.com/turnerlabs/terraform-provider-harbor/issues/13))
+
+- output `build token` ([#16](https://github.com/turnerlabs/terraform-provider-harbor/issues/16))
+
+- Add `harbor_loadbalancer` datasource that uses new trigger api rather than aws calls ([#12](https://github.com/turnerlabs/terraform-provider-harbor/issues/12))
+
+- Support for IAM certs ([#11](https://github.com/turnerlabs/terraform-provider-harbor/issues/11))
+
+- Adds more examples ([#40](https://github.com/turnerlabs/terraform-provider-harbor/issues/40))
+
+
+Bug Fixes:
+
+- Error running plan with output after importing ([#31](https://github.com/turnerlabs/terraform-provider-harbor/issues/31))
+
+- Preserve build token on changes that involve downtime ([#33](https://github.com/turnerlabs/terraform-provider-harbor/issues/33))
+
+
+
 ## 0.4.0 (2017-11-10)
 
 Features:

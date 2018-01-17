@@ -82,19 +82,23 @@ type EnvVarPayload struct {
 
 // PortPayload represents a port
 type PortPayload struct {
-	Name                string `json:"name"`
-	Value               int    `json:"value,omitempty"`
-	Protocol            string `json:"protocol,omitempty"`
-	Healthcheck         string `json:"healthcheck,omitempty"`
-	Primary             bool   `json:"primary"`
-	External            bool   `json:"external,omitempty"`
-	PublicVip           bool   `json:"public_vip,omitempty"`
-	PublicPort          int    `json:"public_port,omitempty"`
-	EnableProxyProtocol bool   `json:"enable_proxy_protocol,omitempty"`
-	SslArn              string `json:"ssl_arn,omitempty"`
-	SslManagementType   string `json:"ssl_management_type,omitempty"`
-	HealthcheckTimeout  *int   `json:"healthcheck_timeout,omitempty"`
-	HealthcheckInterval *int   `json:"healthcheck_interval,omitempty"`
+	Name                 string `json:"name"`
+	Value                int    `json:"value,omitempty"`
+	Protocol             string `json:"protocol,omitempty"`
+	Healthcheck          string `json:"healthcheck,omitempty"`
+	Primary              bool   `json:"primary"`
+	External             bool   `json:"external,omitempty"`
+	PublicVip            bool   `json:"public_vip,omitempty"`
+	PublicPort           int    `json:"public_port,omitempty"`
+	EnableProxyProtocol  bool   `json:"enable_proxy_protocol,omitempty"`
+	SslArn               string `json:"ssl_arn,omitempty"`
+	SslManagementType    string `json:"ssl_management_type,omitempty"`
+	PrivateKey           string `json:"private_key,omitempty"`
+	PublicKeyCertificate string `json:"public_key_certificate,omitempty"`
+	CertificateChain     string `json:"certificate_chain,omitempty"`
+	HealthcheckTimeout   *int   `json:"healthcheck_timeout,omitempty"`
+	HealthcheckInterval  *int   `json:"healthcheck_interval,omitempty"`
+	LBType               string `json:"lbtype,omitempty"`
 }
 
 // ContainerPayload represents a container payload
@@ -113,6 +117,7 @@ type ProviderPayload struct {
 	Barge    string          `json:"barge,omitempty"`
 }
 
+// AnnotationsPayload represents annotations
 type AnnotationsPayload struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
@@ -240,25 +245,14 @@ type Shipment struct {
 	EnvVars []EnvVarPayload `json:"envVars,omitempty"`
 }
 
-type getLoadBalancerStatusResponse struct {
-	LoadBalancers []struct {
-		LoadBalancerArn       string `json:"load_balancer_arn"`
-		DNSName               string `json:"dns_name"`
-		CanonicalHostedZoneID string `json:"canonical_hosted_zone_id"`
-		CreatedTime           string `json:"created_time"`
-		LoadBalancerName      string `json:"load_balancer_name"`
-		Scheme                string `json:"scheme"`
-		VpcID                 string `json:"vpc_id"`
-		State                 struct {
-			Code string `json:"code"`
-		} `json:"state"`
-		Type              string `json:"type"`
-		AvailabilityZones []struct {
-			ZoneName string `json:"zone_name"`
-			SubnetID string `json:"subnet_id"`
-		} `json:"availability_zones"`
-		SecurityGroups []string `json:"security_groups"`
-		IPAddressType  string   `json:"ip_address_type"`
-	} `json:"load_balancers"`
-	LbName string `json:"lb_name"`
+// LoadBalancer represents a load balancer
+type LoadBalancer struct {
+	Name                  string `json:"name"`
+	Type                  string `json:"type"`
+	Public                bool   `json:"public"`
+	ARN                   string `json:"arn"`
+	DNSName               string `json:"dnsName"`
+	CanonicalHostedZoneID string `json:"canonicalHostedZoneId"`
+	VpcID                 string `json:"vpcId"`
+	State                 string `json:"state"`
 }
