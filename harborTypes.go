@@ -64,6 +64,7 @@ type ShipmentEnvironment struct {
 	ParentShipment   ParentShipment       `json:"parentShipment"`
 	BuildToken       string               `json:"buildToken,omitempty"`
 	EnableMonitoring bool                 `json:"enableMonitoring"`
+	IamRole          string               `json:"iamRole"`
 }
 
 // The ParentShipment of the shipmentModel
