@@ -58,6 +58,11 @@ func resourceHarborShipmentEnv() *schema.Resource {
 				Default:  "default",
 				ForceNew: true,
 			},
+			"iam_role": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
 			"log_shipping": &schema.Schema{
 				Description: "Configure harbor log shipping",
 				Optional:    true,
@@ -554,6 +559,7 @@ func transformShipmentEnvironmentToTerraform(shipmentEnv *ShipmentEnvironment, d
 	d.Set("shipment", shipmentEnv.ParentShipment.Name)
 	d.Set("environment", shipmentEnv.Name)
 	d.Set("monitored", shipmentEnv.EnableMonitoring)
+	d.Set("iam_role", shipmentEnv.IamRole)
 
 	provider := ec2Provider(shipmentEnv.Providers)
 	d.Set("barge", provider.Barge)
@@ -674,6 +680,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 		},
 		Name:             d.Get("environment").(string),
 		EnableMonitoring: d.Get("monitored").(bool),
+		IamRole:          d.Get("iam_role").(string),
 	}
 
 	//add default ec2 provider
@@ -685,7 +692,7 @@ func transformTerraformToShipmentEnvironment(d *schema.ResourceData, existingShi
 	}
 	result.Providers = append(result.Providers, provider)
 
-	//copy over any existing user-defined environment-level env vars
+	//copy over any existing user-defined data (not defined in tf)
 	if existingShipmentEnvironment != nil {
 		result.EnvVars = copyUserDefinedEnvVars(existingShipmentEnvironment.EnvVars)
 
