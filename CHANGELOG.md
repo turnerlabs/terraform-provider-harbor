@@ -1,3 +1,12 @@
+## 0.6.0 (2018-02-07)
+
+Features:
+
+- Adds aws role support via `iam_role` ([#10](https://github.com/turnerlabs/terraform-provider-harbor/issues/16))
+
+- Adds user/version to telemetry payload ([#41](https://github.com/turnerlabs/terraform-provider-harbor/issues/41))
+
+
 ## 0.5.0 (2018-01-17)
 
 Features:
