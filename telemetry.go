@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/user"
 	"runtime"
 	"strings"
 )
@@ -22,27 +21,30 @@ type metric struct {
 }
 
 const (
-	telemetryURI = "https://telemetry.harbor.turnerlabs.io/v1/api/metric"
-
 	metricShipmentCreate = "shipment.create"
 	metricShipmentUpdate = "shipment.update"
 	metricShipmentDelete = "shipment.delete"
 	metricShipmentImport = "shipment.import"
 
-	metricEnvCreate = "env.create"
-	metricEnvUpdate = "env.update"
-	metricEnvDelete = "env.delete"
-	metricEnvImport = "env.import"
+	metricEnvCreate   = "env.create"
+	metricEnvRecreate = "env.recreate"
+	metricEnvUpdate   = "env.update"
+	metricEnvDelete   = "env.delete"
+	metricEnvImport   = "env.import"
 
 	metricHarborLoadbalancerRead = "harbor_loadbalancer.read"
 )
 
-func writeMetric(action string) {
-	writeMetricErrorString(action, "")
+func getTelemetryEndpoint() string {
+	return GetConfig().TelemetryURI + "/v1/api/metric"
 }
 
-func writeMetricError(action string, err error) {
-	writeMetricErrorString(action, err.Error())
+func writeMetric(action string, user string) {
+	writeMetricErrorString(action, user, "")
+}
+
+func writeMetricError(action string, user string, err error) {
+	writeMetricErrorString(action, user, err.Error())
 }
 
 func getVersion() string {
@@ -54,13 +56,10 @@ func getVersion() string {
 	return version
 }
 
-func writeMetricErrorString(action string, err string) {
+func writeMetricErrorString(action string, user string, err string) {
 
 	// HARBOR_TELEMETRY=0 disables telemetry
 	if setting := os.Getenv("HARBOR_TELEMETRY"); setting != "0" {
-
-		user, e := user.Current()
-		check(e)
 
 		m := metric{
 			Source:  "terraform-provider-harbor",
@@ -68,12 +67,12 @@ func writeMetricErrorString(action string, err string) {
 			Error:   err,
 			OS:      runtime.GOOS,
 			Arch:    runtime.GOARCH,
-			User:    user.Username,
+			User:    user,
 			Version: getVersion(),
 		}
 
 		if Verbose {
-			log.Println("posting telemetry data to: " + telemetryURI)
+			log.Println("posting telemetry data to: " + getTelemetryEndpoint())
 		}
 
 		//talk to the server in the background to keep things moving
@@ -83,7 +82,7 @@ func writeMetricErrorString(action string, err string) {
 
 func postTelemetryData(m metric) {
 	json, _ := json.Marshal(m)
-	req, err := http.NewRequest("POST", telemetryURI, bytes.NewBuffer(json))
+	req, err := http.NewRequest("POST", getTelemetryEndpoint(), bytes.NewBuffer(json))
 	req.Header.Set("X-key", "0vgKlex4EUckdHYCJq2BPBCyJ5E")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}

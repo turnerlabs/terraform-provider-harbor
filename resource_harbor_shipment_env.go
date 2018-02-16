@@ -292,11 +292,15 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 	}
 
 	//save shipment/environment
-	writeMetric(metricEnvCreate)
+	action := metricEnvCreate
+	if harborMeta.existingShipmentEnvironment != nil {
+		action = metricEnvRecreate
+	}
+	writeMetric(action, auth.Username)
 	saveSuccess, buildToken := SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
 	if !saveSuccess {
 		newErr := fmt.Errorf("SaveShipmentEnvironment failed")
-		writeMetricError(metricEnvCreate, newErr)
+		writeMetricError(metricEnvCreate, auth.Username, newErr)
 		return newErr
 	}
 
@@ -308,7 +312,7 @@ func resourceHarborShipmentEnvironmentCreate(d *schema.ResourceData, meta interf
 			failureMessage += m + "\n"
 		}
 		newErr := fmt.Errorf("trigger failed: %v", failureMessage)
-		writeMetricError(metricEnvCreate, newErr)
+		writeMetricError(metricEnvCreate, auth.Username, newErr)
 		return newErr
 	}
 
@@ -395,7 +399,7 @@ func resourceHarborShipmentEnvironmentDelete(d *schema.ResourceData, meta interf
 		return errors.New("shipment/environment doesn't exist")
 	}
 
-	writeMetric(metricEnvDelete)
+	writeMetric(metricEnvDelete, auth.Username)
 
 	//set replicas to 0 and trigger
 	provider := ProviderPayload{
@@ -450,22 +454,22 @@ func resourceHarborShipmentEnvironmentRead(d *schema.ResourceData, meta interfac
 
 func resourceHarborShipmentEnvironmentImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 
-	writeMetric(metricEnvImport)
-
 	//lookup and set the arguments
 	auth := meta.(*harborMeta).auth
+	writeMetric(metricEnvImport, auth.Username)
+
 	shipment, env := idParts(d.Id())
 	shipmentEnv := GetShipmentEnvironment(auth.Username, auth.Token, shipment, env)
 	if shipmentEnv == nil {
 		newErr := errors.New("shipment/environment doesn't exist")
-		writeMetricError(metricEnvImport, newErr)
+		writeMetricError(metricEnvImport, auth.Username, newErr)
 		return nil, newErr
 	}
 
 	//transform shipit model back to terraform
 	err := transformShipmentEnvironmentToTerraform(shipmentEnv, d)
 	if err != nil {
-		writeMetricError(metricEnvImport, err)
+		writeMetricError(metricEnvImport, auth.Username, err)
 		return nil, err
 	}
 
@@ -525,7 +529,7 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 	}
 
 	//save shipment/environment
-	writeMetric(metricEnvUpdate)
+	writeMetric(metricEnvUpdate, auth.Username)
 	SaveShipmentEnvironment(auth.Username, auth.Token, *shipmentEnv)
 
 	//trigger shipment
@@ -536,7 +540,7 @@ func resourceHarborShipmentEnvironmentUpdate(d *schema.ResourceData, meta interf
 			failureMessage += m + "\n"
 		}
 		newErr := fmt.Errorf("trigger failed: %v", failureMessage)
-		writeMetricError(metricEnvUpdate, newErr)
+		writeMetricError(metricEnvUpdate, auth.Username, newErr)
 		return newErr
 	}
 
