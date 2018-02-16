@@ -56,7 +56,10 @@ func generateRandomID() string {
 }
 
 func dataSourceHarborLoadbalancerRead(d *schema.ResourceData, meta interface{}) error {
-	writeMetric(metricHarborLoadbalancerRead)
+	harborMeta := meta.(*harborMeta)
+	auth := harborMeta.auth
+
+	writeMetric(metricHarborLoadbalancerRead, auth.Username)
 	d.SetId(generateRandomID())
 
 	shipment := d.Get("shipment").(string)
@@ -65,7 +68,7 @@ func dataSourceHarborLoadbalancerRead(d *schema.ResourceData, meta interface{}) 
 	//query harbor for the lb status
 	result, err := getLoadBalancerStatus(shipment, environment)
 	if err != nil {
-		writeMetricError(metricHarborLoadbalancerRead, err)
+		writeMetricError(metricHarborLoadbalancerRead, auth.Username, err)
 		return err
 	}
 
